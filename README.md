@@ -107,7 +107,7 @@ SMTP、微信、Webhook 在网页「设置」里配置，敏感字段用 AES-GCM
 ## 开发
 
 ```bash
-mvn test          # 73 个测试，全部用 MockWebServer/GreenMail，不访问真实 12306
+mvn test          # 81 个测试，全部用 MockWebServer/GreenMail，不访问真实 12306
 mvn package       # 产出 target/tickethelper-linux.jar
 java -jar target/tickethelper-linux.jar   # DATA_DIR/PORT/ADMIN_PASSWORD 三个变量
 ```
