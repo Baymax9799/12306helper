@@ -38,6 +38,17 @@
         <p id="qr-msg" class="muted"></p>
       </div>
       <details>
+        <summary>短信验证码登录（手边只有手机时用）</summary>
+        <input id="sms-user" placeholder="12306 手机号 / 用户名">
+        <input id="sms-pass" type="password" placeholder="12306 密码（只在本次请求使用，不保存）">
+        <div class="row" style="margin-top:8px">
+          <input id="sms-code" placeholder="短信验证码" style="flex:1">
+          <button id="sms-send" class="ghost">获取验证码</button>
+          <button id="sms-login" class="primary">登录</button>
+        </div>
+        <p id="sms-msg" class="muted"></p>
+      </details>
+      <details>
         <summary>粘贴 Cookie 登录（兜底）</summary>
         <textarea id="cookie-input" rows="3" placeholder="RAIL_DEVICEID=...; _passport_session=..."></textarea>
         <button id="cookie-import" class="ghost">导入</button>

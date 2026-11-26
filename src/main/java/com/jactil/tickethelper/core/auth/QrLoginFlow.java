@@ -90,28 +90,9 @@ public final class QrLoginFlow {
         };
     }
 
-    /** 换票 + 取用户信息。失败不抛，登录态已由 Cookie 决定。 */
+    /** 换票 + 取用户信息：与短信登录共用同一条链。 */
     private String completeAuthChain(String loginUamtk) {
-        String username = "";
-        try {
-            String uamtkBody = client.post(base + "/passport/web/auth/uamtk", Map.of("appid", "otn"));
-            JsonNode uamtk = JSON.readTree(uamtkBody);
-            String tk = uamtk.path("newapptk").asText("");
-            int code = uamtk.path("result_code").asInt(-1);
-            if (tk.isEmpty() && !loginUamtk.isEmpty()) {
-                log.debug("uamtk 未给 newapptk（code={}），降级用登录响应的 uamtk", code);
-                tk = loginUamtk;
-            }
-            if (!tk.isEmpty()) {
-                client.post(base + "/otn/uamauthclient", Map.of("tk", tk));
-            }
-            String me = client.get(base + "/otn/index/initMy12306Api");
-            JsonNode data = JSON.readTree(me).path("data");
-            username = data.path("user_name").asText(data.path("login_name").asText(""));
-        } catch (Exception e) {
-            log.warn("换票链未完全成功（登录态通常仍然有效）：{}", e.getMessage());
-        }
-        return username;
+        return AuthChain.complete(client, base, loginUamtk);
     }
 
     private void ensureSession() throws IOException {

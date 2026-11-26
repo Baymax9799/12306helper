@@ -20,6 +20,12 @@ public final class AuthApi {
     public record CookieImport(String cookieHeader) {
     }
 
+    public record SmsSend(String username) {
+    }
+
+    public record SmsLogin(String username, String password, String smsCode) {
+    }
+
     public static void register(Javalin app, AppContext ctx) {
         app.post("/api/auth/admin", c -> {
             AdminLogin body = c.bodyAsClass(AdminLogin.class);
@@ -73,6 +79,42 @@ public final class AuthApi {
                 c.json(out);
             } catch (java.io.IOException e) {
                 throw ApiException.serverError("查询扫码状态失败：" + e.getMessage());
+            }
+        });
+
+        app.post("/api/auth/sms/send", c -> {
+            SmsSend body = c.bodyAsClass(SmsSend.class);
+            if (body == null || body.username() == null || body.username().isBlank()) {
+                throw ApiException.badRequest("请填写 12306 手机号/用户名");
+            }
+            try {
+                var result = ctx.smsLogin.sendCode(body.username().trim());
+                if (!result.ok()) {
+                    throw ApiException.badRequest(result.message());
+                }
+                c.json(Map.of("ok", true, "message", result.message()));
+            } catch (java.io.IOException e) {
+                throw ApiException.serverError("发送短信验证码失败：" + e.getMessage());
+            }
+        });
+
+        app.post("/api/auth/sms/login", c -> {
+            SmsLogin body = c.bodyAsClass(SmsLogin.class);
+            if (body == null || body.username() == null || body.password() == null
+                    || body.smsCode() == null) {
+                throw ApiException.badRequest("需要 username / password / smsCode");
+            }
+            try {
+                var result = ctx.smsLogin.login(body.username().trim(), body.password(),
+                        body.smsCode().trim());
+                if (!result.ok()) {
+                    throw ApiException.unauthorized(result.message());
+                }
+                ctx.markLoggedIn(result.username());
+                c.json(Map.of("ok", true, "username",
+                        result.username() == null ? "" : result.username()));
+            } catch (java.io.IOException e) {
+                throw ApiException.serverError("短信登录失败：" + e.getMessage());
             }
         });
 

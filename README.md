@@ -56,7 +56,7 @@ docker compose up -d --build
 
 ## 首次使用
 
-1. **登录 12306**：点「扫码登录」，用 12306 App 扫码；也可以粘贴浏览器 Cookie 兜底
+1. **登录 12306**：点「扫码登录」，用 12306 App 扫码；手边只有手机时用「短信验证码登录」（密码只在本次请求使用、不保存）；还可以粘贴浏览器 Cookie 兜底
 2. **同步乘车人**：本地只保存掩码姓名与证件后四位
 3. **建任务**：出发站、到达站、日期、席别、乘车人；要抢开售就填「开抢时刻」
 4. **选择模式**：
@@ -107,7 +107,7 @@ SMTP、微信、Webhook 在网页「设置」里配置，敏感字段用 AES-GCM
 ## 开发
 
 ```bash
-mvn test          # 81 个测试，全部用 MockWebServer/GreenMail，不访问真实 12306
+mvn test          # 85 个测试，全部用 MockWebServer/GreenMail，不访问真实 12306
 mvn package       # 产出 target/tickethelper-linux.jar
 java -jar target/tickethelper-linux.jar   # DATA_DIR/PORT/ADMIN_PASSWORD 三个变量
 ```

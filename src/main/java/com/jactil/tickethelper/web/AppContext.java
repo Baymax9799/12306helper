@@ -45,6 +45,7 @@ public final class AppContext implements AutoCloseable {
     public final ServerClock clock;
     public final TicketClient client;
     public final QrLoginFlow qrLogin;
+    public final com.jactil.tickethelper.core.auth.SmsLoginFlow smsLogin;
     public final LeftTicketQuery query;
     public final PassengerSync passengerSync;
     public final StationRegistry stations = new StationRegistry();
@@ -70,6 +71,7 @@ public final class AppContext implements AutoCloseable {
         this.clock = clock;
         this.client = client;
         this.qrLogin = new QrLoginFlow(client);
+        this.smsLogin = new com.jactil.tickethelper.core.auth.SmsLoginFlow(client);
         this.query = new LeftTicketQuery(client);
         this.passengerSync = new PassengerSync(client);
         this.bus = new EventBus(this.store);

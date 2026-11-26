@@ -128,6 +128,34 @@ async function pollQr(uuid) {
   } catch (e) { clearInterval(state.qrTimer); toast(e.message, true); }
 }
 
+$('sms-send').onclick = async () => {
+  $('sms-msg').textContent = '';
+  try {
+    const r = await api('/api/auth/sms/send', {
+      method: 'POST', body: JSON.stringify({ username: $('sms-user').value.trim() }),
+    });
+    $('sms-msg').textContent = r.message || '验证码已发送';
+  } catch (e) { $('sms-msg').textContent = e.message; }
+};
+
+$('sms-login').onclick = async () => {
+  $('sms-msg').textContent = '';
+  try {
+    const r = await api('/api/auth/sms/login', {
+      method: 'POST', body: JSON.stringify({
+        username: $('sms-user').value.trim(),
+        password: $('sms-pass').value,
+        smsCode: $('sms-code').value.trim(),
+      }),
+    });
+    $('sms-pass').value = '';
+    $('sms-code').value = '';
+    toast('12306 登录成功' + (r.username ? '：' + r.username : ''));
+    refreshStatus();
+    loadPassengers();
+  } catch (e) { $('sms-msg').textContent = e.message; }
+};
+
 $('cookie-import').onclick = async () => {
   try {
     const r = await api('/api/auth/cookie', {
