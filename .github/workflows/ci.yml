@@ -28,7 +28,7 @@ jobs:
         run: |
           java -jar target/tickethelper-linux.jar &
           for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:8080/healthz; then echo; exit 0; fi
+            if curl -fsS http://127.0.0.1:28080/healthz; then echo; exit 0; fi
             sleep 1
           done
           echo "服务没起来"; exit 1

@@ -38,7 +38,8 @@ class WaitlistServiceTest {
 
     private TrainRow train() {
         return new TrainRow("G1001", "IZQ", "IOQ", "广州南", "深圳北", "08:00", "08:40", "00:40",
-                "20261201", "S", "L", Map.of("二等座", new SeatInfo("O", "二等座", 0, "候补")));
+                "20261201", "S", "L", Map.of("二等座", new SeatInfo("O", "二等座", 0, "候补")),
+                Map.of("二等座", new java.math.BigDecimal("74.50")));
     }
 
     private List<PassengerSync.Remote> pax() {

@@ -2,8 +2,9 @@ target/
 data/*
 !data/.gitkeep
 logs/
+_smoke*/
 *.iml
 .idea/
 .vscode/
 *.log
-_smoke/
+*-sqlitejdbc.dll

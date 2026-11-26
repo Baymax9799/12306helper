@@ -1,23 +1,25 @@
 services:
   tickethelper:
+    # 有远端镜像就用远端，没有就本地构建；两条命令都能跑：
+    #   docker compose up -d            （本地构建并启动）
+    #   docker compose pull && up -d    （用 Docker Hub 上的镜像）
+    image: baymax9799/tickethelper-linux:latest
     build: .
-    image: tickethelper-linux:0.1
     container_name: tickethelper
     restart: unless-stopped
     ports:
-      # 只绑内网；要公网自己接反代
-      - "8080:8080"
+      # 左边是宿主端口，冲突就改 HOST_PORT（或直接改这里）
+      - "${HOST_PORT:-28080}:28080"
     environment:
       TZ: Asia/Shanghai
-      # 留空 = 首次启动随机生成口令并打印到日志（docker compose logs -f tickethelper | grep 口令）
-      # 想自己定就直接填，别用弱口令
-      ADMIN_PASSWORD: ""
+      # 留空 = 首次启动随机生成口令并打印到日志
+      # 查看：docker compose logs tickethelper | grep 口令
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
       JAVA_OPTS: "-Xms128m -Xmx384m"
     volumes:
-      # 会话、配置、日志、数据库都在这里，务必备份
       - ./data:/data
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:28080/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3

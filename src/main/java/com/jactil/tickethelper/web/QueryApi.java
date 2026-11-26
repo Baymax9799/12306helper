@@ -88,6 +88,8 @@ public final class QueryApi {
             seat.put("count", s.count());
             seat.put("raw", s.raw());
             seat.put("available", s.available());
+            java.math.BigDecimal price = t.price(e.getKey());
+            seat.put("price", price == null ? null : price.toPlainString());
             seats.put(e.getKey(), seat);
         }
         out.put("seats", seats);

@@ -48,7 +48,7 @@ git push -u origin main
 ```bash
 git log --oneline          # 9 条提交，M0→M3 的演进过程
 git status                 # 应该是 clean
-mvn -B test                # 85 个测试全绿（CI 也会跑这个）
+mvn -B test                # 87 个测试全绿（CI 也会跑这个）
 docker compose config      # 检查 compose 语法
 ```
 

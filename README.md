@@ -1,137 +1,139 @@
-# TicketHelper-Linux
+# tickethelper-linux
 
-把 [JavaFx-TicketHelper](https://github.com/Jactil777/JavaFx-TicketHelper)（JavaFX 桌面版 12306 助手）重构为**无界面 Web 服务**，用 Docker 部署在 NAS 上 7×24 跑。
+12306 抢票工具的无界面版本，跑在 Docker 里，用浏览器操作。原项目 [JavaFx-TicketHelper](https://github.com/Jactil777/JavaFx-TicketHelper) 是 JavaFX 桌面程序，这里把界面拆了，换成 Web 服务和一套 HTTP 接口。
 
-- **无 GUI、无 VNC**：一个容器 + 一个网页，手机也能操作
-- **扫码登录**：不落盘 12306 密码，不在无头环境里跟滑块死磕
-- **抢到就停**：只做到「订单待支付」，**永不自动付款**；命中后全局暂停，避免把账号额度烧光
-- **限速与小黑屋**：全局令牌桶 + 车次级冷却，不刷爆 12306
-- **定时开抢**：开抢前 30 秒预热，开售 60 秒提频到 300ms，之后自动退避
+为什么要拆：抢票要守到放票那一刻，桌面程序得开着电脑；换成常驻服务，扔在 NAS 上就行，手机也能看。
 
-> ⚠️ 本项目仅供**个人**抢购**本人**车票。禁止代购、倒票、多账号批量操作。12306 用户协议对自动化工具有限制，使用风险自负。
+## 现在能做什么
 
----
+| 功能 | 状态 |
+|---|---|
+| 扫码登录 / 短信验证码登录 / 粘贴 Cookie | 可用 |
+| 余票查询，带各席别票价 | 可用 |
+| 乘车人同步（本地只存掩码，不存身份证号） | 可用 |
+| 建任务：多车次、多日期、多席别、多乘客 | 可用 |
+| 定时开抢：提前 30 秒预热，放票后 60 秒内 300ms 一轮 | 可用 |
+| 自动提交订单，停在「待支付」 | 已实现，参数需实盘对一次 |
+| 邮件 / 微信 / Webhook 通知 | 可用 |
+| 候补下单 | 默认关闭，见文末 |
 
-## 功能与真实状态
+抢到之后不会替你付款，也不会替你取消订单。这两件事都得人在 12306 App 里做，原因在下面「关于每日额度」。
 
-| 功能 | 状态 | 说明 |
-|---|---|---|
-| 扫码登录 / 短信登录 / Cookie 导入 | ✅ 已实现 | 单测覆盖调用链；扫码是主路径 |
-| 余票查询与解析 | ✅ 已实现 | 列索引用真实响应固化，有回归测试 |
-| 乘车人同步 | ✅ 已实现 | 本地**只存掩码**，不存身份证号 |
-| 多任务 / 多车次 / 多日期 / 多席别 | ✅ 已实现 | 每任务一个线程，共享限速 |
-| 定时开抢 / 预热 / 提频 | ✅ 已实现 | 相位计算有单测 |
-| 下单到「待支付」 | ⚠️ 已实现，**待实盘校正** | 六步流程与参数按公开实现写，需用真实账号跑一次确认 |
-| 账号闸门 + 每日单量 | ✅ 已实现 | 抢到即全局 HOLD；启动 + 每 60s 对账 |
-| 通知（邮件 / 微信 / Webhook） | ✅ 已实现 | Server酱 / PushPlus / 企微机器人三选一 |
-| 候补 | ⚠️ 实验性，默认关闭 | 参数格式未实盘验证，`WAITLIST_ENABLED=true` 才启用 |
-| 票价显示 | ❌ 未做 | 票价字段是变长拼装，没有稳定文档 |
-| 自动支付 | ❌ 永远不做 | 涉及资金与指纹/人脸，且风控必挂 |
+## 部署
 
-## 一分钟部署（NAS / 任何有 Docker 的机器）
+镜像端口固定 28080，宿主机端口由 `HOST_PORT` 决定，默认也是 28080。撞端口就改 `.env`，不用动 compose 文件。
+
+### 方式一：本地构建（现在就能用）
 
 ```bash
-git clone <this-repo> tickethelper
-cd tickethelper
-mkdir -p data
-echo "ADMIN_PASSWORD=$(openssl rand -base64 12)" > .env   # 也可以直接改 docker-compose.yml
+git clone https://github.com/Baymax9799/tickethelper-linux.git
+cd tickethelper-linux
+cp .env.example .env          # 可选。想改端口或指定口令就改这里
 docker compose up -d --build
+docker compose logs tickethelper | grep 口令
 ```
 
-打开 `http://<NAS_IP>:8080`，用 `ADMIN_PASSWORD` 登录。
+构建要多等几分钟，Maven 要下依赖。起来后浏览器打开 `http://<NAS地址>:28080`。
 
-> 不设 `ADMIN_PASSWORD` 时，首次启动会随机生成一个口令并打印在日志里：
-> `docker compose logs -f tickethelper | grep 口令`
+`.env` 里 `ADMIN_PASSWORD` 留空的话，首次启动会随机生成一个 16 位口令，上面那条 `logs | grep 口令` 就是取它。日志里找不到，说明之前已经初始化过，口令存在 `data/settings.json` 里（bcrypt 哈希，取不出明文）——忘了就删 `data/settings.json` 重来。
 
-### 飞牛 fnOS 上的落地步骤
+### 方式二：从 Docker Hub 拉
 
-1. 「Docker」→「Compose」→ 新建项目，工作目录选 `/vol1/1000/docker/tickethelper`
-2. 把仓库文件放进去，或直接把 `docker-compose.yml` 内容粘进 Compose 编辑器
-3. 终端里 `cd /vol1/1000/docker/tickethelper && chown -R 1000:1000 data`
-4. 启动 → 浏览器访问 `http://<NAS_IP>:8080`
+`docker-compose.hub.yml` 只拉镜像、不编译，适合不想在 NAS 上装源码的场景：
 
-### 群晖 / 威联通 / unRAID
+```bash
+docker compose -f docker-compose.hub.yml up -d
+```
 
-都一样：能跑 `docker compose` 就能部署。镜像构建需要能访问 Maven 中央仓库（国内建议在 `~/.m2/settings.xml` 配阿里云镜像，或在构建阶段加 `--build-arg`）。
+**这个文件目前还用不了**——我手上没有你的 Docker Hub 账号，镜像没推上去过。要启用它，先在你的机器上推一次：
 
-## 首次使用
+```bash
+docker login
+docker build -t baymax9799/tickethelper-linux:latest .
+docker push baymax9799/tickethelper-linux:latest
+```
 
-1. **登录 12306**：点「扫码登录」，用 12306 App 扫码；手边只有手机时用「短信验证码登录」（密码只在本次请求使用、不保存）；还可以粘贴浏览器 Cookie 兜底
-2. **同步乘车人**：本地只保存掩码姓名与证件后四位
-3. **建任务**：出发站、到达站、日期、席别、乘车人；要抢开售就填「开抢时刻」
-4. **选择模式**：
-   - 监控模式（默认）：命中余票只推送通知，不下单
-   - 自动下单：命中即提交，成功后停在待支付 —— 勾选前会二次确认
-5. **收到通知后**：30 分钟内去 12306 付款；然后回到本服务点「我已付款 / 我已取消」解锁闸门
+或者打个 tag 交给 GitHub Actions。仓库里 `.github/workflows/docker-publish.yml` 会在推 `v*` tag 时自动构建并推送，需要在 Settings → Secrets 里加 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN` 两个变量。
 
-## 为什么抢到就全局暂停
+### 目录权限
 
-12306 规则：**自然日内未支付或取消订单合计超过 3 次，账号当天线上购票权限被锁**。
-所以本服务在抢到第一单后立刻 `HOLD` 所有任务，并且不替你自动取消订单（每取消一次就烧掉 1/3 额度，还可能触发人脸核验）。
+容器用 uid 1000 跑。`data/` 目录在仓库里有个占位文件，clone 下来就存在，但如果它是 Docker 在你第一次 `up` 时创建的，属主会是 root，服务写不进数据库，表现是启动后反复重启。修法：
 
-每日下单上限默认 1，可在设置里调到 3（不建议）。
+```bash
+sudo chown -R 1000:1000 data
+docker compose restart tickethelper
+```
+
+## 用起来
+
+1. 输管理员口令进页面。
+2. 点「扫码登录」，手机 12306 扫二维码。人不在家、手边只有手机的时候，用下面的「短信验证码登录」——密码只在这次请求里用一下，不落盘。
+3. 点「同步乘车人」，把 12306 里的乘车人拉过来。本地只存 `张*` 和 `****1234` 这种掩码。
+4. 在「查余票」里看一眼目标车次和票价，确认要抢的是哪几趟。
+5. 建任务：填起终站、日期、席别、乘车人。要抢放票就填「开抢时刻」，到点自己提速。
+6. 决定要不要开自动下单。不开就是监控模式，查到票只发通知。
+
+## 关于每日额度
+
+12306 的规则：一个自然日里，未支付或者取消的订单加起来超过 3 次，账号当天的线上购票权限就被锁。
+
+所以这个服务在抢到第一单之后会暂停**所有**任务，等你去处理。它也不替你取消订单——每取消一次就烧掉三分之一额度，还可能弹人脸核验，无头环境过不去。
+
+每日下单上限默认 1，设置里可以调到 3。我建议留 1。
+
+抢到票的处理顺序：收到通知 → 去 12306 付款 → 回来点「我已付款」解锁。
 
 ## 配置
 
-`docker-compose.yml` 里的环境变量：
+端口和口令走 `.env`，其余在页面「设置」里改。
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `ADMIN_PASSWORD` | 空 | 管理员口令；留空则随机生成并打印 |
-| `PORT` | `8080` | 监听端口 |
-| `DATA_DIR` | `/data` | 数据库 / 会话 / 配置 / 日志目录 |
-| `JAVA_OPTS` | `-Xms128m -Xmx384m` | 384MB 堆足够单账号多任务 |
-| `WAITLIST_ENABLED` | `false` | 是否启用实验性候补下单 |
-| `TZ` | `Asia/Shanghai` | 时区，影响每日额度结算 |
+| `HOST_PORT` | `28080` | 宿主机端口 |
+| `ADMIN_PASSWORD` | 空 | 留空则首次启动随机生成并打印 |
+| `JAVA_OPTS` | `-Xms128m -Xmx384m` | 单账号多任务够用 |
+| `TZ` | `Asia/Shanghai` | 影响每日额度的结算日 |
+| `WAITLIST_ENABLED` | `false` | 候补下单开关 |
 
-SMTP、微信、Webhook 在网页「设置」里配置，敏感字段用 AES-GCM 加密落盘（密钥在 `/data/secret.key`，权限 600）。
+SMTP、微信推送、Webhook 在页面里填。密码和 Key 用 AES-GCM 加密后写进 `data/settings.json`，密钥在 `data/secret.key`，权限 600。备份 `data/` 就等于备份了全部状态（包括 12306 的登录 Cookie，别随便传）。
 
-## 架构
+微信推送走的是 Server酱 / PushPlus / 企业微信机器人。个人申请不到能发模板消息的公众号，这三条是等价的替代品，一个 Key 就能通。
 
-```
-浏览器 ── HTTP :8080 ──┐
-                       ▼
-              web (Javalin 6 + 静态页 + 轮询事件)
-                       │
-              engine (调度 / 状态机 / 闸门 / 小黑屋 / 限速)
-                       │
-              core   (OkHttp · 扫码登录 · 查询解析 · 站点 · 校时)
-                       │                    │
-                 SQLite(/data)         kyfw.12306.cn
-```
+## 已知问题
 
-- 事件用**轮询**而不是 SSE：7×24 长连接是最容易泄漏的地方，客户端 2 秒拉一次增量
-- 会话 Cookie 原子落盘，容器重启不掉登录；`RAIL_DEVICEID` 单独持久化，避免风控指纹变化
-- 12306 的 302 被当作「会话失效/被风控」信号，不会被 OkHttp 悄悄跟过去
+**下单参数要实盘对一次。** 六个接口（`submitOrderRequest` → `initDc` → `checkOrderInfo` → `getQueueCount` → `confirmSingleForQueue` → `queryOrderWaitTime`）的顺序和参数名是照公开实现写的，有回放测试，但 12306 改版频繁。第一次真用请开着日志看。
+
+**席别列 24/25/26/30 的含义有歧义。** 公开资料在「软座还是无座」「高级软卧还是特等座」上互相矛盾。这里沿用了上游作者的映射，代码里集中在 `SeatCatalog` 一张表，实盘发现错位改一行就行。
+
+**票价只覆盖有票的席别。** 数据来自 `queryI` 响应里的票价段（按 10 字符一组切，首位席别代码 + 6 位分），售完或不存在的席别没有价格可显示。
+
+**候补默认不提交。** `confirmHB` 的参数是几段拼装字符串，猜错可能触发风控，所以默认只在页面提示、退化为普通抢票。要试就设 `WAITLIST_ENABLED=true`，并且知道自己在做什么。
+
+**单账号、仅内网。** 表结构留了 `account_id`，加多账号是加法。服务不处理 HTTPS，要公网访问自己接反向代理，记得把 Cookie 的 `Secure` 打开。
 
 ## 开发
 
 ```bash
-mvn test          # 85 个测试，全部用 MockWebServer/GreenMail，不访问真实 12306
-mvn package       # 产出 target/tickethelper-linux.jar
-java -jar target/tickethelper-linux.jar   # DATA_DIR/PORT/ADMIN_PASSWORD 三个变量
+mvn test        # 87 个用例，全用 MockWebServer / GreenMail，不碰真实 12306
+mvn package     # target/tickethelper-linux.jar
+java -jar target/tickethelper-linux.jar
 ```
 
-目录：
+本地跑要三个环境变量：`DATA_DIR`、`PORT`、`ADMIN_PASSWORD`。
+
+代码分四层，依赖方向单向：`core`（HTTP、登录、解析）← `engine`（调度、下单、闸门）← `web`（接口和页面）← `app`（装配）。
 
 ```
 src/main/java/com/jactil/tickethelper/
-├── app/      进程入口
+├── app/      入口
 ├── core/     client · auth · query · station · passenger · store · config · security · time
 ├── engine/   调度 · 状态机 · 下单 · 闸门 · 对账 · 候补
 ├── notify/   邮件 · 微信 · Webhook
 └── web/      API 与装配
 ```
 
-## 已知限制（老实说）
+## 许可
 
-1. **下单参数待实盘校正**：`submitOrderRequest → initDc → checkOrderInfo → getQueueCount → confirmSingleForQueue → queryOrderWaitTime` 的顺序与参数名按公开实现写，并有 MockWebServer 契约测试，但 12306 改版频繁，第一次真用请盯着日志。
-2. **席别列 24/25/26/30 的语义**：公开资料互相矛盾（软座 vs 无座、高级软卧 vs 特等座）。这里沿用上游作者的映射，代码里集中在一张表，实盘发现错位改一处即可。
-3. **候补默认关闭**：`confirmHB` 的参数是几段拼装字符串，猜错可能触发风控，所以默认只在页面提示、退化为普通抢票。
-4. **单账号**：v1 只支持一个 12306 账号（表结构已留 `account_id`，扩多账号是加法不是改法）。
-5. **没有票价**：省掉一块不稳定解析，不影响下单。
-6. **仅内网**：服务默认不处理 HTTPS，要公网请自己接反向代理并打开 Cookie 的 `Secure`。
+MIT。派生自 [JavaFx-TicketHelper](https://github.com/Jactil777/JavaFx-TicketHelper)，原项目版权归 jactil 所有，见 [LICENSE](./LICENSE)。
 
-## 许可证
-
-MIT。派生自 [JavaFx-TicketHelper](https://github.com/Jactil777/JavaFx-TicketHelper)，原项目版权归 jactil 所有，详见 [LICENSE](./LICENSE)。
+只给本人买票用。别拿它代购、倒票、开多账号批量刷，12306 的用户协议也不允许自动化工具。

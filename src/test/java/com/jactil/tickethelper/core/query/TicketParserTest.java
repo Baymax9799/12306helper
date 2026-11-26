@@ -9,6 +9,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -71,6 +72,26 @@ class TicketParserTest {
 
         assertEquals(SeatInfo.ABSENT, t.seat("硬卧").count(), "硬卧记录值为空");
         assertFalse(t.seat("硬卧").exists());
+    }
+
+    @Test
+    void pricesComeFromTheRecordedField() throws IOException {
+        // [39]='9019950003M009950000O007450000O007453000'
+        // 按 10 字符一组：9=199.50（商务座）、M=99.50（一等座）、O=74.50（二等座）
+        TrainRow t = TicketParser.parse(LeftTicketQuery.toJson(realLine(), "广州南", "深圳北"), code -> code)
+                .get(0);
+
+        assertEquals(0, new java.math.BigDecimal("74.50").compareTo(t.price("二等座")));
+        assertEquals(0, new java.math.BigDecimal("99.50").compareTo(t.price("一等座")));
+        assertEquals(0, new java.math.BigDecimal("199.50").compareTo(t.price("商务座/特等座")));
+        assertNull(t.price("硬卧"), "记录里没有硬卧票价");
+    }
+
+    @Test
+    void priceParserRejectsFieldsThatAreNotPrices() {
+        assertTrue(PriceParser.parseGroups("90M0O0W0").isEmpty());
+        assertTrue(PriceParser.parseGroups("").isEmpty());
+        assertTrue(PriceParser.parseGroups("9019950003M00995X000O007450000O0074530").isEmpty());
     }
 
     @Test

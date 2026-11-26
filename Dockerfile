@@ -19,7 +19,7 @@ RUN apt-get update \
 ENV TZ=Asia/Shanghai \
     DATA_DIR=/data \
     JAVA_OPTS="-Xms128m -Xmx384m" \
-    PORT=8080
+    PORT=28080
 
 RUN useradd --uid 1000 --create-home --home-dir /home/app app \
  && mkdir -p /data \
@@ -29,7 +29,7 @@ WORKDIR /app
 COPY --from=build /src/target/tickethelper-linux.jar /app/app.jar
 
 USER 1000
-EXPOSE 8080
+EXPOSE 28080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
   CMD curl -fsS "http://127.0.0.1:${PORT}/healthz" || exit 1

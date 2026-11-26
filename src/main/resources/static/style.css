@@ -172,3 +172,14 @@ summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   .card { margin: 10px; padding: 12px; }
   header { flex-wrap: wrap; }
 }
+
+/* 查余票结果 */
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.result { margin-top: 12px; overflow-x: auto; }
+table.trains { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.trains th, table.trains td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+table.trains th { color: var(--muted); font-weight: 500; white-space: nowrap; }
+.seats { display: flex; flex-wrap: wrap; gap: 6px; }
+.seat { padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
+.seat.ok { color: var(--ok); border-color: #1f6f3f; }
+.seat.off { color: var(--muted); }

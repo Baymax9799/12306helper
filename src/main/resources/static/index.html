@@ -56,6 +56,20 @@
     </section>
 
     <section class="card">
+      <h2>查余票</h2>
+      <div class="grid3">
+        <label>出发站<input id="q-from" placeholder="广州南"></label>
+        <label>到达站<input id="q-to" placeholder="深圳北"></label>
+        <label>日期<input id="q-date" type="date"></label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="q-run" class="primary">查询</button>
+        <span id="q-msg" class="muted"></span>
+      </div>
+      <div id="q-result" class="result"></div>
+    </section>
+
+    <section class="card">
       <div class="row space">
         <h2>任务</h2>
         <button id="task-toggle" class="ghost small">＋ 新建</button>

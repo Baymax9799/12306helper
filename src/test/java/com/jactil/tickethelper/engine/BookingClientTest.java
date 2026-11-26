@@ -40,7 +40,8 @@ class BookingClientTest {
     private TrainRow train() {
         return new TrainRow("G1001", "IZQ", "IOQ", "广州南", "深圳北", "08:00", "08:40", "00:40",
                 "20261201", "SECRET%2BTOKEN", "LOC1",
-                Map.of("二等座", new SeatInfo("O", "二等座", 3, "3")));
+                Map.of("二等座", new SeatInfo("O", "二等座", 3, "3")),
+                Map.of("二等座", new java.math.BigDecimal("74.50")));
     }
 
     @BeforeEach

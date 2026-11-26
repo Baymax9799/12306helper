@@ -55,6 +55,7 @@ $('logout').onclick = async () => {
 async function enterApp() {
   $('login-view').hidden = true;
   $('app-view').hidden = false;
+  $('q-date').value = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
   await Promise.all([loadMeta(), refreshStatus(), loadPassengers(), loadTasks(), loadOrders(), loadSettings()]);
   startLogs();
   setInterval(refreshStatus, 5000);
@@ -182,6 +183,47 @@ async function loadPassengers() {
   $('pax-box').innerHTML = state.passengers.map(p =>
     `<label class="chip"><input type="checkbox" value="${p.id}"> ${p.nameMasked} ${p.idNoMasked}</label>`
   ).join('') || '<span class="muted">先点「同步乘车人」</span>';
+}
+
+/* ---------------- 查余票 ---------------- */
+
+$('q-run').onclick = async () => {
+  $('q-msg').textContent = '查询中…';
+  $('q-result').innerHTML = '';
+  try {
+    const r = await api('/api/query', {
+      method: 'POST',
+      body: JSON.stringify({ date: $('q-date').value, from: $('q-from').value.trim(), to: $('q-to').value.trim() }),
+    });
+    $('q-msg').textContent = `共 ${r.total} 趟，显示 ${r.count} 趟`;
+    renderTrains(r.trains);
+  } catch (e) {
+    $('q-msg').textContent = e.message;
+  }
+};
+
+function renderTrains(trains) {
+  if (!trains.length) {
+    $('q-result').innerHTML = '<p class="muted">没有查到车次</p>';
+    return;
+  }
+  const rows = trains.map((t) => {
+    const seats = Object.entries(t.seats).map(([name, s]) => {
+      const price = s.price ? `¥${s.price}` : '';
+      const count = s.count > 0 ? `${s.count} 张` : (s.raw || '无');
+      return `<span class="seat ${s.available ? 'ok' : 'off'}">${escapeHtml(name)} ${escapeHtml(count)}${price ? ' · ' + price : ''}</span>`;
+    }).join('');
+    return `<tr>
+      <td class="mono">${escapeHtml(t.trainNo)}</td>
+      <td>${escapeHtml(t.startTime)}<div class="muted">${escapeHtml(t.fromName)}</div></td>
+      <td>${escapeHtml(t.arriveTime)}<div class="muted">${escapeHtml(t.toName)}</div></td>
+      <td class="muted">${escapeHtml(t.duration)}</td>
+      <td><div class="seats">${seats || '<span class="muted">无席别信息</span>'}</div></td>
+    </tr>`;
+  }).join('');
+  $('q-result').innerHTML = `<table class="trains">
+    <thead><tr><th>车次</th><th>出发</th><th>到达</th><th>历时</th><th>席别 / 余票 / 票价</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
 }
 
 /* ---------------- 任务 ---------------- */

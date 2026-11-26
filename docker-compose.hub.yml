@@ -1,0 +1,21 @@
+# 只拉镜像、不构建。用于 NAS 上没装源码、也不想编译的场景。
+# 前提：镜像已经推到 Docker Hub（见 README 的「发布镜像」一节）。
+services:
+  tickethelper:
+    image: baymax9799/tickethelper-linux:latest
+    container_name: tickethelper
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-28080}:28080"
+    environment:
+      TZ: Asia/Shanghai
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
+      JAVA_OPTS: "-Xms128m -Xmx384m"
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:28080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s

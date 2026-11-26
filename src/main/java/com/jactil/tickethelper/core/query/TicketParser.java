@@ -74,7 +74,8 @@ public final class TicketParser {
                 f[13],
                 f[0],
                 f.length > 36 ? f[36] : "",
-                SeatCatalog.parse(f));
+                SeatCatalog.parse(f),
+                PriceParser.parse(f));
     }
 
     private static String abbreviate(String body) {
