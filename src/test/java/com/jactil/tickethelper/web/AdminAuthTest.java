@@ -24,12 +24,13 @@ class AdminAuthTest {
     Path tmp;
 
     private Javalin app;
+    private AppContext ctx;
     private HttpClient http;
     private String base;
 
     @BeforeEach
     void setUp() {
-        AppContext ctx = AppContext.boot(AppPaths.resolve(tmp.resolve("data").toString(), "unused"));
+        ctx = AppContext.boot(AppPaths.resolve(tmp.resolve("data").toString(), "unused"));
         Settings settings = ctx.settings();
         settings.adminPasswordHash = Passwords.hash("s3cret");
         ctx.updateSettings(settings);
@@ -42,6 +43,7 @@ class AdminAuthTest {
     @AfterEach
     void tearDown() {
         app.stop();
+        ctx.close();
     }
 
     @Test

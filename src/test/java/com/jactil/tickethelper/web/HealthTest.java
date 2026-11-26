@@ -33,6 +33,7 @@ class HealthTest {
             assertTrue(response.body().contains("\"ok\""), "body=" + response.body());
         } finally {
             app.stop();
+            ctx.close();
         }
     }
 }
