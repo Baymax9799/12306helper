@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: 单元测试（不访问真实 12306）
+        run: mvn -B test
+
+      - name: 打包
+        run: mvn -B -DskipTests package
+
+      - name: 冒烟启动
+        run: |
+          java -jar target/tickethelper-linux.jar &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/healthz; then echo; exit 0; fi
+            sleep 1
+          done
+          echo "服务没起来"; exit 1
+        env:
+          ADMIN_PASSWORD: ci-test-password
+          DATA_DIR: ${{ runner.temp }}/data
