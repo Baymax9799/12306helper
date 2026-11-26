@@ -54,6 +54,8 @@ public final class AppContext implements AutoCloseable {
     public final Blacklist blacklist = new Blacklist();
     public final TaskEngine engine;
     public final com.jactil.tickethelper.notify.NotifyDispatcher notifier;
+    public final com.jactil.tickethelper.engine.OrderReconciler reconciler;
+    public final java.util.concurrent.ScheduledExecutorService scheduler;
 
     private volatile Settings settings;
     private volatile BookingAttempt booking = new DisabledBooking();
@@ -78,6 +80,13 @@ public final class AppContext implements AutoCloseable {
                 this.stations::nameOf));
         this.notifier = new com.jactil.tickethelper.notify.NotifyDispatcher(this::settings);
         this.bus.subscribe(this.notifier::onEvent);
+        this.reconciler = new com.jactil.tickethelper.engine.OrderReconciler(this.store, this.gate,
+                this.bus, new com.jactil.tickethelper.engine.OrderFetcher(client));
+        this.scheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "reconciler");
+            t.setDaemon(true);
+            return t;
+        });
     }
 
     public static AppContext boot(AppPaths paths) {
@@ -111,6 +120,15 @@ public final class AppContext implements AutoCloseable {
         AppContext ctx = new AppContext(paths, store, settings, db, client, clock);
         ctx.engine.markStaleTasksPaused();
         ctx.loadStations();
+        ctx.scheduler.scheduleWithFixedDelay(() -> {
+            try {
+                if (ctx.loggedIn()) {
+                    ctx.reconciler.runOnce();
+                }
+            } catch (RuntimeException e) {
+                log.warn("周期对账失败：{}", e.getMessage());
+            }
+        }, 60, 60, java.util.concurrent.TimeUnit.SECONDS);
         return ctx;
     }
 
@@ -175,6 +193,7 @@ public final class AppContext implements AutoCloseable {
 
     @Override
     public void close() {
+        scheduler.shutdownNow();
         engine.close();
         notifier.shutdown();
         db.close();

@@ -63,6 +63,11 @@ public final class OpsApi {
             c.json(out);
         });
 
+        app.post("/api/orders/reconcile", c -> {
+            int found = ctx.reconciler.runOnce();
+            c.json(Map.of("found", found, "gate", ctx.store.gate().state()));
+        });
+
         app.get("/api/events", c -> {
             long after = parseLong(c.queryParam("after"), 0);
             int limit = Math.min(500, Math.max(1, (int) parseLong(c.queryParam("limit"), 200)));
