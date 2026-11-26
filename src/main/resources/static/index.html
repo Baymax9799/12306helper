@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TicketHelper · 12306 抢票</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div id="login-view" class="card narrow">
+  <h1>TicketHelper<span class="dot">·</span>Linux</h1>
+  <p class="muted">管理员口令在首次启动的容器日志里，或由 <code>ADMIN_PASSWORD</code> 指定。</p>
+  <input id="admin-pwd" type="password" placeholder="管理员口令" autocomplete="current-password">
+  <button id="admin-login" class="primary">进入</button>
+  <div id="admin-err" class="err"></div>
+</div>
+
+<div id="app-view" hidden>
+  <header>
+    <span class="brand">TicketHelper</span>
+    <span id="login-state" class="pill off">未登录 12306</span>
+    <span id="gate-state" class="pill">闸门 —</span>
+    <label class="switch"><input type="checkbox" id="auto-booking"> 自动下单</label>
+    <button id="logout" class="ghost small">退出</button>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>12306 登录</h2>
+      <div class="row">
+        <button id="qr-start" class="primary">扫码登录</button>
+        <button id="pax-sync" class="ghost">同步乘车人</button>
+        <span id="pax-count" class="muted"></span>
+      </div>
+      <div id="qr-box" hidden>
+        <img id="qr-img" alt="12306 登录二维码">
+        <p id="qr-msg" class="muted"></p>
+      </div>
+      <details>
+        <summary>粘贴 Cookie 登录（兜底）</summary>
+        <textarea id="cookie-input" rows="3" placeholder="RAIL_DEVICEID=...; _passport_session=..."></textarea>
+        <button id="cookie-import" class="ghost">导入</button>
+      </details>
+    </section>
+
+    <section class="card">
+      <div class="row space">
+        <h2>任务</h2>
+        <button id="task-toggle" class="ghost small">＋ 新建</button>
+      </div>
+      <div id="tasks" class="list"></div>
+
+      <form id="task-form" class="form" hidden>
+        <div class="grid2">
+          <label>任务名<input name="name" placeholder="回长沙"></label>
+          <label>轮询间隔(ms)<input name="intervalMs" type="number" value="1000" min="500" max="5000"></label>
+          <label>出发站<input name="from" placeholder="广州南" required></label>
+          <label>到达站<input name="to" placeholder="长沙南" required></label>
+          <label>乘车日期（逗号分隔）<input name="dates" placeholder="2026-12-01,2026-12-02" required></label>
+          <label>车次（留空=不限）<input name="trains" placeholder="G1001,G1003"></label>
+          <label>开抢时刻（可空）<input name="startAt" type="datetime-local"></label>
+          <label>模式
+            <select name="mode">
+              <option value="GRAB">抢票</option>
+              <option value="WAITLIST">候补</option>
+            </select>
+          </label>
+        </div>
+        <fieldset><legend>席别</legend><div id="seat-box" class="chips"></div></fieldset>
+        <fieldset><legend>乘车人</legend><div id="pax-box" class="chips"></div></fieldset>
+        <div class="row">
+          <button type="submit" class="primary">保存</button>
+          <button type="button" id="task-cancel" class="ghost">取消</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>实时日志</h2>
+      <div id="logs" class="logs"></div>
+    </section>
+
+    <section class="card">
+      <h2>订单</h2>
+      <div id="orders" class="list"></div>
+    </section>
+
+    <section class="card">
+      <h2>设置</h2>
+      <div class="grid2">
+        <label>每日单量上限<input id="set-limit" type="number" min="1" max="3"></label>
+        <label>默认轮询间隔(ms)<input id="set-interval" type="number" min="500" max="5000"></label>
+        <label>SMTP 主机<input id="set-smtp-host"></label>
+        <label>SMTP 端口<input id="set-smtp-port" type="number"></label>
+        <label>发件账号<input id="set-smtp-user"></label>
+        <label>授权码/密码<input id="set-smtp-pass" type="password" placeholder="不修改则留空"></label>
+        <label>收件地址<input id="set-smtp-to"></label>
+        <label>微信通道
+          <select id="set-wx-provider">
+            <option value="serverchan">Server酱</option>
+            <option value="pushplus">PushPlus</option>
+            <option value="wecom">企业微信机器人</option>
+          </select>
+        </label>
+        <label>微信 Key / Webhook<input id="set-wx-key" placeholder="不修改则留空"></label>
+      </div>
+      <div class="row">
+        <button id="save-settings" class="primary">保存设置</button>
+        <button id="test-notify" class="ghost">发测试通知</button>
+        <span id="settings-msg" class="muted"></span>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<script src="/app.js"></script>
+</body>
+</html>

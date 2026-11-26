@@ -6,12 +6,22 @@ import com.jactil.tickethelper.core.config.SettingsStore;
 import com.jactil.tickethelper.core.client.PersistentCookieStore;
 import com.jactil.tickethelper.core.client.TicketClient;
 import com.jactil.tickethelper.core.auth.QrLoginFlow;
+import com.jactil.tickethelper.core.passenger.PassengerSync;
 import com.jactil.tickethelper.core.query.LeftTicketQuery;
 import com.jactil.tickethelper.core.security.AesGcm;
 import com.jactil.tickethelper.core.security.Passwords;
+import com.jactil.tickethelper.core.station.StationRegistry;
 import com.jactil.tickethelper.core.store.Db;
 import com.jactil.tickethelper.core.store.Store;
 import com.jactil.tickethelper.core.time.ServerClock;
+import com.jactil.tickethelper.engine.AccountGate;
+import com.jactil.tickethelper.engine.BookingAttempt;
+import com.jactil.tickethelper.engine.DisabledBooking;
+import com.jactil.tickethelper.engine.EventBus;
+import com.jactil.tickethelper.engine.RateLimiter;
+import com.jactil.tickethelper.engine.Blacklist;
+import com.jactil.tickethelper.engine.TaskEngine;
+import com.jactil.tickethelper.engine.TaskRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,8 +46,17 @@ public final class AppContext implements AutoCloseable {
     public final TicketClient client;
     public final QrLoginFlow qrLogin;
     public final LeftTicketQuery query;
+    public final PassengerSync passengerSync;
+    public final StationRegistry stations = new StationRegistry();
+    public final EventBus bus;
+    public final AccountGate gate;
+    public final RateLimiter limiter;
+    public final Blacklist blacklist = new Blacklist();
+    public final TaskEngine engine;
+    public final com.jactil.tickethelper.notify.NotifyDispatcher notifier;
 
     private volatile Settings settings;
+    private volatile BookingAttempt booking = new DisabledBooking();
 
     private AppContext(AppPaths paths, SettingsStore store, Settings settings, Db db,
                        TicketClient client, ServerClock clock) {
@@ -50,6 +69,15 @@ public final class AppContext implements AutoCloseable {
         this.client = client;
         this.qrLogin = new QrLoginFlow(client);
         this.query = new LeftTicketQuery(client);
+        this.passengerSync = new PassengerSync(client);
+        this.bus = new EventBus(this.store);
+        this.gate = new AccountGate(this.store, clock, this::settings);
+        this.limiter = new RateLimiter(settings.intervalMs);
+        this.engine = new TaskEngine(new TaskRunner.Deps(this.store, this.query, this.limiter,
+                this.blacklist, this.bus, this.clock, this.gate, () -> this.booking,
+                this.stations::nameOf));
+        this.notifier = new com.jactil.tickethelper.notify.NotifyDispatcher(this::settings);
+        this.bus.subscribe(this.notifier::onEvent);
     }
 
     public static AppContext boot(AppPaths paths) {
@@ -80,16 +108,47 @@ public final class AppContext implements AutoCloseable {
         TicketClient client = new TicketClient(cookieStore, clock);
         log.info("12306 会话 Cookie：{} 个", cookieStore.size());
 
-        return new AppContext(paths, store, settings, db, client, clock);
+        AppContext ctx = new AppContext(paths, store, settings, db, client, clock);
+        ctx.engine.markStaleTasksPaused();
+        ctx.loadStations();
+        return ctx;
+    }
+
+    /** 站点库：启动时拉一次，失败就等用户点刷新。 */
+    public void loadStations() {
+        try {
+            stations.refresh(client);
+        } catch (RuntimeException e) {
+            log.warn("站点库初始化失败：{}", e.getMessage());
+        }
     }
 
     public Settings settings() {
         return settings;
     }
 
+    public BookingAttempt booking() {
+        return booking;
+    }
+
+    public boolean autoBooking() {
+        return booking instanceof com.jactil.tickethelper.engine.RealBooking;
+    }
+
+    /** 每次开启自动下单都新建一个实例，避免共享可变状态。 */
+    public BookingAttempt createRealBooking() {
+        return new com.jactil.tickethelper.engine.RealBooking(store, passengerSync,
+                new com.jactil.tickethelper.engine.BookingClient(client));
+    }
+
+    public void setBooking(BookingAttempt booking) {
+        this.booking = booking;
+    }
+
     public synchronized void updateSettings(Settings updated) {
         this.settings = updated;
         this.settingsStore.save(updated);
+        this.limiter.setIntervalMs(updated.intervalMs);
     }
 
     /** 是否已登录 12306：有落库的会话，且 Cookie 不为空。 */
@@ -97,16 +156,15 @@ public final class AppContext implements AutoCloseable {
         return store.loadSession(ACCOUNT_ID).isPresent() && client.store().size() > 0;
     }
 
-    /** 会话到期时间，没记录就返回 null。 */
     public Instant sessionExpiresAt() {
         return store.loadSession(ACCOUNT_ID).map(Store.SessionRow::expiresAt).orElse(null);
     }
 
     public void markLoggedIn(String username) {
-        client.store().dumpHeader();
         store.saveSession(ACCOUNT_ID, client.store().dumpHeader(), client.store().railDeviceId(),
                 Instant.now().plusSeconds(14L * 24 * 3600));
-        store.appendEvent(null, "INFO", "12306 登录成功：" + (username == null || username.isBlank() ? "未知用户" : username));
+        store.appendEvent(null, "INFO", "12306 登录成功："
+                + (username == null || username.isBlank() ? "未知用户" : username));
     }
 
     public void markLoggedOut() {
@@ -117,6 +175,8 @@ public final class AppContext implements AutoCloseable {
 
     @Override
     public void close() {
+        engine.close();
+        notifier.shutdown();
         db.close();
     }
 }
