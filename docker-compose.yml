@@ -9,8 +9,9 @@ services:
       - "8080:8080"
     environment:
       TZ: Asia/Shanghai
-      # 首次启动的口令，务必改掉；留空则自动生成并打印到日志
-      ADMIN_PASSWORD: "change-me-please"
+      # 留空 = 首次启动随机生成口令并打印到日志（docker compose logs -f tickethelper | grep 口令）
+      # 想自己定就直接填，别用弱口令
+      ADMIN_PASSWORD: ""
       JAVA_OPTS: "-Xms128m -Xmx384m"
     volumes:
       # 会话、配置、日志、数据库都在这里，务必备份

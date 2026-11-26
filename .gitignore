@@ -1,7 +1,9 @@
 target/
-data/
+data/*
+!data/.gitkeep
 logs/
 *.iml
 .idea/
 .vscode/
 *.log
+_smoke/
