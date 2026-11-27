@@ -3,6 +3,8 @@
 services:
   tickethelper:
     image: ${IMAGE:-baymax9799/12306helper:latest}
+    # 每次 up 都去远端核对一次，避免「Hub 上更新了、本地还是旧的」
+    pull_policy: always
     container_name: 12306helper
     restart: unless-stopped
     ports:

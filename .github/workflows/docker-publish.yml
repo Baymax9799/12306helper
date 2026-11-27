@@ -20,6 +20,8 @@ on:
       - '.gitignore'
       - '.gitattributes'
       - '.github/**'
+      - 'docker-compose*.yml'
+      - '.env.example'
   workflow_dispatch:
 
 concurrency:
