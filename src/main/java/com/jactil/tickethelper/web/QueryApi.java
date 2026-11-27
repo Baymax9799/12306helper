@@ -34,6 +34,13 @@ public final class QueryApi {
             } catch (RuntimeException e) {
                 throw ApiException.badRequest("日期格式必须是 yyyy-MM-dd：" + req.date());
             }
+            LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"));
+            if (date.isBefore(today)) {
+                throw ApiException.badRequest("不能查过去的日期");
+            }
+            if (date.isAfter(today.plusDays(14))) {
+                throw ApiException.badRequest("12306 只放 15 天内的票，最远能查到 " + today.plusDays(14));
+            }
             String from = resolve(ctx, req.from());
             String to = resolve(ctx, req.to());
             if (from.equals(to)) {
@@ -64,8 +71,17 @@ public final class QueryApi {
         if (v.length() == 3 && ctx.stations.knows(v.toUpperCase())) {
             return v.toUpperCase();
         }
-        return ctx.stations.codeOf(v)
-                .orElseThrow(() -> ApiException.badRequest("不是有效车站：" + v));
+        return ctx.stations.codeOf(v).orElseThrow(() -> {
+            // 用户很可能填的是城市名（广州）而不是具体车站（广州南），把候选列出来
+            var candidates = ctx.stations.search(v, 6);
+            if (candidates.isEmpty()) {
+                return ApiException.badRequest("没有这个车站：" + v);
+            }
+            String options = candidates.stream()
+                    .map(s -> s.name() + "(" + s.code() + ")")
+                    .collect(java.util.stream.Collectors.joining("、"));
+            return ApiException.badRequest("「" + v + "」不是一个具体车站，请从下拉里选： " + options);
+        });
     }
 
     static Map<String, Object> view(TrainRow t) {

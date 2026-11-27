@@ -12,7 +12,9 @@ import java.sql.Statement;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -187,6 +189,20 @@ public final class Store {
     // ---------- passenger ----------
 
     public void replacePassengers(long accountId, List<PassengerRow> rows) {
+        // 12306 返回的乘客里 code 可能重复甚至为空，原样批量插入会撞 UNIQUE 约束，
+        // 整批回滚——用户看到的就是「写入乘车人失败」。这里先去重、再跳过无 pid 的行。
+        Map<String, PassengerRow> unique = new LinkedHashMap<>();
+        int skipped = 0;
+        for (PassengerRow r : rows) {
+            if (r.pid() == null || r.pid().isBlank()) {
+                skipped++;
+                continue;
+            }
+            unique.put(r.pid(), r);
+        }
+        if (skipped > 0) {
+            log.warn("有 {} 位乘车人没有乘客 ID，已跳过（无法用于下单）", skipped);
+        }
         synchronized (db) {
             try {
                 db.conn().setAutoCommit(false);
@@ -197,9 +213,15 @@ public final class Store {
                 }
                 String sql = """
                         INSERT INTO passenger(account_id,pid,name_masked,id_type,id_no_masked,ticket_type,synced_at)
-                        VALUES(?,?,?,?,?,?,?)""";
+                        VALUES(?,?,?,?,?,?,?)
+                        ON CONFLICT(account_id,pid) DO UPDATE SET
+                          name_masked=excluded.name_masked,
+                          id_type=excluded.id_type,
+                          id_no_masked=excluded.id_no_masked,
+                          ticket_type=excluded.ticket_type,
+                          synced_at=excluded.synced_at""";
                 try (PreparedStatement ps = db.conn().prepareStatement(sql)) {
-                    for (PassengerRow r : rows) {
+                    for (PassengerRow r : unique.values()) {
                         ps.setLong(1, accountId);
                         ps.setString(2, r.pid());
                         ps.setString(3, r.nameMasked());
@@ -214,7 +236,7 @@ public final class Store {
                 db.conn().commit();
             } catch (SQLException e) {
                 rollback();
-                throw new IllegalStateException("写入乘车人失败", e);
+                throw new IllegalStateException("写入乘车人失败：" + e.getMessage(), e);
             } finally {
                 restoreAutoCommit();
             }

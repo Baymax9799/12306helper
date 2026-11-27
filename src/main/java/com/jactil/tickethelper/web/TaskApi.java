@@ -115,7 +115,6 @@ public final class TaskApi {
         if (req == null) {
             throw ApiException.badRequest("请求体为空");
         }
-        String name = req.name() == null || req.name().isBlank() ? "未命名任务" : req.name().trim();
         String mode = req.mode() == null || req.mode().isBlank() ? "GRAB" : req.mode().toUpperCase();
         if (!mode.equals("GRAB") && !mode.equals("WAITLIST")) {
             throw ApiException.badRequest("mode 只能是 GRAB 或 WAITLIST");
@@ -131,13 +130,26 @@ public final class TaskApi {
             throw ApiException.badRequest("至少选一个乘车日期");
         }
         dates.sort(String::compareTo);
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"));
         for (String d : dates) {
+            LocalDate parsed;
             try {
-                LocalDate.parse(d);
+                parsed = LocalDate.parse(d);
             } catch (RuntimeException e) {
                 throw ApiException.badRequest("日期格式必须是 yyyy-MM-dd：" + d);
             }
+            if (parsed.isBefore(today)) {
+                throw ApiException.badRequest("乘车日期不能早于今天：" + d);
+            }
+            if (parsed.isAfter(today.plusDays(14))) {
+                throw ApiException.badRequest("12306 只放 15 天内的票，最远到 " + today.plusDays(14));
+            }
         }
+
+        // 不再要求用户填任务名，用「出发→到达 首个日期」自动生成
+        String name = req.name() == null || req.name().isBlank()
+                ? ctx.stations.nameOf(from) + "→" + ctx.stations.nameOf(to) + " " + dates.get(0)
+                : req.name().trim();
 
         List<String> seatTypes = req.seatTypes() == null ? List.of() : req.seatTypes();
         if (seatTypes.isEmpty()) {

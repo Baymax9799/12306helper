@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>12306Helper · 12306 抢票</title>
+<title>12306Helper · 抢票</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 
 <div id="login-view" class="card narrow">
-  <h1>12306Helper<span class="dot">·</span>Linux</h1>
+  <h1>12306Helper</h1>
   <p class="muted">管理员口令在首次启动的容器日志里，或由 <code>ADMIN_PASSWORD</code> 指定。</p>
   <input id="admin-pwd" type="password" placeholder="管理员口令" autocomplete="current-password">
   <button id="admin-login" class="primary">进入</button>
@@ -26,96 +26,108 @@
   </header>
 
   <main>
-    <section class="card">
-      <h2>12306 登录</h2>
+    <section class="card" id="login-card">
       <div class="row">
         <button id="qr-start" class="primary">扫码登录</button>
-        <button id="pax-sync" class="ghost">同步乘车人</button>
-        <span id="pax-count" class="muted"></span>
+        <button id="sms-toggle" class="ghost">短信登录</button>
+        <span id="login-hint" class="muted">用 12306 App 扫码</span>
       </div>
       <div id="qr-box" hidden>
-        <img id="qr-img" alt="12306 登录二维码">
+        <img id="qr-img" alt="登录二维码">
         <p id="qr-msg" class="muted"></p>
       </div>
-      <details>
-        <summary>短信验证码登录（手边只有手机时用）</summary>
+      <div id="sms-box" hidden>
         <input id="sms-user" placeholder="12306 手机号 / 用户名">
-        <input id="sms-pass" type="password" placeholder="12306 密码（只在本次请求使用，不保存）">
-        <div class="row" style="margin-top:8px">
+        <input id="sms-pass" type="password" placeholder="密码（只在本次请求使用，不保存）">
+        <div class="row">
           <input id="sms-code" placeholder="短信验证码" style="flex:1">
           <button id="sms-send" class="ghost">获取验证码</button>
           <button id="sms-login" class="primary">登录</button>
         </div>
         <p id="sms-msg" class="muted"></p>
-      </details>
-      <details>
-        <summary>粘贴 Cookie 登录（兜底）</summary>
-        <textarea id="cookie-input" rows="3" placeholder="RAIL_DEVICEID=...; _passport_session=..."></textarea>
-        <button id="cookie-import" class="ghost">导入</button>
-      </details>
+      </div>
     </section>
 
     <section class="card">
-      <h2>查余票</h2>
-      <div class="grid3">
-        <label>出发站<input id="q-from" placeholder="广州南"></label>
-        <label>到达站<input id="q-to" placeholder="深圳北"></label>
-        <label>日期<input id="q-date" type="date"></label>
+      <div class="search-grid">
+        <div class="field">
+          <label>出发</label>
+          <input id="from-input" placeholder="城市或车站，如 广州" autocomplete="off">
+          <div id="from-list" class="dropdown" hidden></div>
+        </div>
+        <div class="field">
+          <label>到达</label>
+          <input id="to-input" placeholder="城市或车站，如 长沙" autocomplete="off">
+          <div id="to-list" class="dropdown" hidden></div>
+        </div>
+        <div class="field">
+          <label>乘车日期</label>
+          <input id="date-input" type="date">
+        </div>
+        <div class="field field-btn">
+          <label>&nbsp;</label>
+          <button id="btn-add-date" class="ghost">加日期</button>
+        </div>
+        <div class="field field-btn">
+          <label>&nbsp;</label>
+          <button id="btn-query" class="primary">查询</button>
+        </div>
       </div>
-      <div class="row" style="margin-top:10px">
-        <button id="q-run" class="primary">查询</button>
-        <span id="q-msg" class="muted"></span>
-      </div>
-      <div id="q-result" class="result"></div>
+      <div id="date-chips" class="chips" style="margin-top:10px"></div>
+      <div id="query-msg" class="muted" style="margin-top:6px"></div>
     </section>
 
     <section class="card">
       <div class="row space">
-        <h2>任务</h2>
-        <button id="task-toggle" class="ghost small">＋ 新建</button>
+        <h2>车次</h2>
+        <span id="train-count" class="muted"></span>
       </div>
-      <div id="tasks" class="list"></div>
-
-      <form id="task-form" class="form" hidden>
-        <div class="grid2">
-          <label>任务名<input name="name" placeholder="回长沙"></label>
-          <label>轮询间隔(ms)<input name="intervalMs" type="number" value="1000" min="500" max="5000"></label>
-          <label>出发站<input name="from" placeholder="广州南" required></label>
-          <label>到达站<input name="to" placeholder="长沙南" required></label>
-          <label>乘车日期（逗号分隔）<input name="dates" placeholder="2026-12-01,2026-12-02" required></label>
-          <label>车次（留空=不限）<input name="trains" placeholder="G1001,G1003"></label>
-          <label>开抢时刻（可空）<input name="startAt" type="datetime-local"></label>
-          <label>模式
-            <select name="mode">
-              <option value="GRAB">抢票</option>
-              <option value="WAITLIST">候补</option>
-            </select>
-          </label>
-        </div>
-        <fieldset><legend>席别</legend><div id="seat-box" class="chips"></div></fieldset>
-        <fieldset><legend>乘车人</legend><div id="pax-box" class="chips"></div></fieldset>
-        <div class="row">
-          <button type="submit" class="primary">保存</button>
-          <button type="button" id="task-cancel" class="ghost">取消</button>
-        </div>
-      </form>
+      <div id="train-table" class="result"></div>
     </section>
 
     <section class="card">
-      <h2>实时日志</h2>
+      <div class="row space">
+        <h2>抢票设置</h2>
+        <span id="start-msg" class="muted"></span>
+      </div>
+      <div class="grid2">
+        <fieldset>
+          <legend>乘客 <button id="pax-sync" class="ghost small" type="button">同步乘车人</button></legend>
+          <div id="pax-box" class="chips"><span class="muted">还没有乘客，先点「同步乘车人」</span></div>
+        </fieldset>
+        <fieldset>
+          <legend>席别</legend>
+          <div id="seat-box" class="chips"></div>
+        </fieldset>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label class="inline">开抢时刻（可空）<input id="start-at" type="datetime-local"></label>
+        <label class="inline">轮询间隔 ms<input id="interval" type="number" value="1000" min="500" max="5000"></label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="btn-start" class="primary">开始抢票</button>
+        <button id="btn-stop" class="ghost">全部停止</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>任务</h2>
+      <div id="tasks" class="list"><span class="muted">还没有任务</span></div>
+    </section>
+
+    <section class="card">
+      <h2>日志</h2>
       <div id="logs" class="logs"></div>
     </section>
 
     <section class="card">
       <h2>订单</h2>
-      <div id="orders" class="list"></div>
+      <div id="orders" class="list"><span class="muted">还没有订单</span></div>
     </section>
 
     <section class="card">
       <h2>设置</h2>
       <div class="grid2">
-        <label>每日单量上限<input id="set-limit" type="number" min="1" max="3"></label>
-        <label>默认轮询间隔(ms)<input id="set-interval" type="number" min="500" max="5000"></label>
         <label>SMTP 主机<input id="set-smtp-host"></label>
         <label>SMTP 端口<input id="set-smtp-port" type="number"></label>
         <label>发件账号<input id="set-smtp-user"></label>
@@ -129,8 +141,9 @@
           </select>
         </label>
         <label>微信 Key / Webhook<input id="set-wx-key" placeholder="不修改则留空"></label>
+        <label>轮询间隔<input id="set-interval" type="number" min="500" max="5000"></label>
       </div>
-      <div class="row">
+      <div class="row" style="margin-top:10px">
         <button id="save-settings" class="primary">保存设置</button>
         <button id="test-notify" class="ghost">发测试通知</button>
         <span id="settings-msg" class="muted"></span>

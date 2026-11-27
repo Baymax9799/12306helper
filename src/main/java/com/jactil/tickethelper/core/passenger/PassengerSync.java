@@ -45,15 +45,33 @@ public final class PassengerSync {
         }
         List<Remote> out = new ArrayList<>(list.size());
         for (JsonNode node : list) {
+            String idNo = node.path("passenger_id_no").asText("");
+            String pid = node.path("code").asText("");
+            if (pid.isBlank()) {
+                // 有的账号里 code 是空的。没有稳定 ID 就没法在本地选中、也没法在下单时对上，
+                // 用证件号派生一个，保证同步和下单两次算出来是同一个。
+                pid = "auto-" + shortHash(idNo);
+            }
             out.add(new Remote(
-                    node.path("code").asText(""),
+                    pid,
                     node.path("passenger_name").asText(""),
                     node.path("passenger_id_type_code").asText(""),
                     node.path("passenger_id_type_name").asText(""),
-                    node.path("passenger_id_no").asText(""),
+                    idNo,
                     node.path("passenger_type_name").asText(node.path("passenger_type").asText(""))));
         }
         return out;
+    }
+
+    /** 证件号派生的稳定短 ID；证件号为空时退回姓名哈希。 */
+    static String shortHash(String raw) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest((raw == null ? "" : raw).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(digest).substring(0, 16);
+        } catch (Exception e) {
+            return Integer.toHexString(String.valueOf(raw).hashCode());
+        }
     }
 
     /** 张来福 -> 张**；两个字：张三 -> 张*。 */
