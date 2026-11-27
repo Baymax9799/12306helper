@@ -1,16 +1,22 @@
 name: Docker
 
-# 打 tag（比如 v0.1.0）时，GitHub 的机器会自动构建镜像并推到 Docker Hub。
-# 不需要你本地装 Docker。
+# 两种触发方式：
+#   - push 到 main：构建并推 `latest` 和 `main`
+#   - 推 v* tag：构建并推 `latest` 和该 tag（发版用）
+# 也可以到 Actions 页面手动 Run workflow。
 #
 # 需要先配两样东西（仓库 Settings → Secrets and variables → Actions）：
-#   1) Docker Hub 用户名：放 Variables 里的 DOCKERHUB_USERNAME 就行（不算机密）；
-#      放 Secrets 里同名也能用，本文件两种都认。
-#   2) Docker Hub Access Token：必须放 Secrets 里的 DOCKERHUB_TOKEN。
+#   Variables: DOCKERHUB_USERNAME  （用户名不算机密）
+#   Secrets:   DOCKERHUB_TOKEN     （Access Token，不要用登录密码）
 on:
   push:
+    branches: [main]
     tags: ['v*']
   workflow_dispatch:
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   publish:
@@ -31,7 +37,7 @@ jobs:
         with:
           context: .
           push: true
-          # 一次推两个标签：latest 和本次的版本号
+          # 一次推两个标签：latest 和本次的版本/分支名
           tags: |
             ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}/12306helper:latest
             ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}/12306helper:${{ github.ref_name }}
