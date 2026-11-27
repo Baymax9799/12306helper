@@ -63,3 +63,51 @@ docker compose config      # 检查 compose 语法
 `docker-compose.yml` 里的 `ADMIN_PASSWORD: "change-me-please"` 是占位符。**别人 clone 后如果直接 `up`，口令就是它**。README 里已经写了要改，但你也可以在仓库 Settings 里把它设成 template 说明，或者干脆把这一行改成 `ADMIN_PASSWORD: ""`（留空则首次启动随机生成并打印到日志，更安全）。
 
 推荐后一种：留空。
+
+---
+
+# 发布镜像到 Docker Hub
+
+镜像名固定 `baymax9799/12306helper`，与 `.env.example` 的 `IMAGE` 对应。两条路选一条。
+
+## 路线一：本机构建后推
+
+```bash
+docker login -u baymax9799
+docker build --build-arg MAVEN_MIRROR=https://maven.aliyun.com/repository/public \
+  -t baymax9799/12306helper:latest .
+docker push baymax9799/12306helper:latest
+```
+
+首次 push 会在 Docker Hub 自动建仓库，默认可见性可能是 Private，去 `https://hub.docker.com/r/baymax9799/12306helper/settings` 改成 Public，否则别人（以及不登录的 NAS）拉不下来。
+
+## 路线二：打 tag 交给 GitHub Actions
+
+CI 定义在 `.github/workflows/docker-publish.yml`，推 `v*` 形式的 tag 时触发，会推 `latest` 和该 tag 两个标签。
+
+1. Docker Hub → Account settings → Personal access tokens → Generate new token，权限 Read & Write，复制（只显示一次）。
+2. GitHub 仓库 → Settings → Secrets and variables → Actions：
+   - **Variables** 页签：`DOCKERHUB_USERNAME` = `baymax9799`
+   - **Secrets** 页签：`DOCKERHUB_TOKEN` = 上一步的 token
+3. 打 tag 并推：
+
+```bash
+git tag -a v0.1.0 -m "第一个版本"
+git push origin v0.1.0
+```
+
+Actions 页看进度，成功后 Docker Hub 上有 `latest` 与 `v0.1.0`。
+
+同名 tag 不能重复推：发新版就换号（`v0.1.1`），或先 `git push origin --delete v0.1.0` 再重打。也可以在 Actions 页手动 Run workflow，但那次的版本标签是分支名（如 `main`），`latest` 照常更新。
+
+## 发完之后核对
+
+```bash
+docker manifest inspect baymax9799/12306helper:latest   # 能返回 JSON 就是推上去了
+```
+
+或直接查 API：
+
+```bash
+curl -s https://hub.docker.com/v2/repositories/baymax9799/12306helper/tags/ | head -c 400
+```

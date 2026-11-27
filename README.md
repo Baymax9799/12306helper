@@ -23,7 +23,7 @@
 
 镜像端口固定 28080，宿主机端口由 `HOST_PORT` 决定，默认也是 28080。撞端口就改 `.env`，不用动 compose 文件。
 
-### 方式一：本地构建（现在就能用）
+### 方式一：本地构建
 
 ```bash
 git clone https://github.com/Baymax9799/12306Helper.git
@@ -33,21 +33,31 @@ docker compose up -d --build
 docker compose logs 12306helper | grep 口令
 ```
 
-构建要多等几分钟，Maven 要下依赖。起来后浏览器打开 `http://<NAS地址>:28080`。
+Maven 要下依赖，国内会慢，建议直接带镜像源构建：
+
+```bash
+docker build --build-arg MAVEN_MIRROR=https://maven.aliyun.com/repository/public \
+  -t baymax9799/12306helper:latest .
+docker compose up -d
+```
+
+ARM 机型再加 `--platform linux/arm64`。起来后浏览器打开 `http://<NAS地址>:28080`。发布新版本镜像的步骤在 [docs/PUBLISH.md](docs/PUBLISH.md)。
 
 `.env` 里 `ADMIN_PASSWORD` 留空的话，首次启动会随机生成一个 16 位口令，上面那条 `logs | grep 口令` 就是取它。日志里找不到，说明之前已经初始化过，口令存在 `data/settings.json` 里（bcrypt 哈希，取不出明文）。
 
 口令的优先级是：**环境变量 > `data/settings.json` 里的旧哈希 > 随机生成**。所以容器环境变量里改了 `ADMIN_PASSWORD`，重启容器就生效，会覆盖之前的旧口令——不是只有首次启动才算数。忘了口令又不想重建数据，就在环境变量里指定一个新的重启。
 
-### 方式二：从 Docker Hub 拉
+### 方式二：从 Docker Hub 拉（推荐）
 
-镜像地址是 `baymax9799/12306helper:latest`。`docker-compose.hub.yml` 只拉镜像、不编译，NAS 上不需要源码、JDK 和 Maven：
+镜像是公开的，直接拉，不需要登录：
 
 ```bash
 docker compose -f docker-compose.hub.yml up -d
 ```
 
-前提是镜像已经发布过（见下面「发布镜像到 Docker Hub」）。仓库如果是 Public，拉取不需要登录；如果设成了 Private，先 `docker login` 再拉。
+NAS 上不需要源码、JDK、Maven。目前 `latest` 和 `v0.1.0` 两个标签都已发布。
+
+**镜像只构建了 amd64。** Intel / AMD 的 x86_64 机器（群晖 DS918+、威联通 TS-x51、自建 E3 这类）可以直接用。ARM 机型（DS220j、树莓派之类）拉下来会报 `exec format error`，得在本地用 `--platform linux/arm64` 自己构建，见「自己构建镜像」。
 
 Docker Hub 用户名不是 `baymax9799` 的话，在 `.env` 里改一行：
 
@@ -81,49 +91,6 @@ chown -R 1000:1000 /vol1/1000/docker/12306helper/data
 sudo chown -R 1000:1000 data
 docker compose restart 12306helper
 ```
-
-## 发布镜像到 Docker Hub
-
-两条路，选一条。仓库名固定为 `12306helper`，和 `.env.example` 里的 `IMAGE` 对应。
-
-### 路线一：本机构建后推
-
-```bash
-docker login -u baymax9799
-docker build -t baymax9799/12306helper:latest .
-docker push baymax9799/12306helper:latest
-```
-
-构建阶段要下 Maven 依赖，国内网络会很慢，可以指定镜像源：
-
-```bash
-docker build \
-  --build-arg MAVEN_MIRROR=https://maven.aliyun.com/repository/public \
-  -t baymax9799/12306helper:latest .
-```
-
-第一次 push 会在 Docker Hub 自动创建仓库，**新仓库的默认可见性可能是 Private**。去 <https://hub.docker.com/r/baymax9799/12306helper/settings> 改成 Public，否则 NAS 上不登录就拉不下来。
-
-### 路线二：打 tag 交给 GitHub Actions
-
-仓库里的 `.github/workflows/docker-publish.yml` 会在推送 `v*` tag 时自动构建并推送 `latest` 和该 tag。
-
-1. Docker Hub → Account settings → Security → New Access Token，权限选 Read & Write，复制出来（只显示一次）。
-2. GitHub 仓库 → Settings → Secrets and variables → Actions：
-   - **Variables** 页签 → New repository variable：`DOCKERHUB_USERNAME` = `baymax9799`（用户名不算机密，放变量里方便查看）
-   - **Secrets** 页签 → New repository secret：`DOCKERHUB_TOKEN` = 上一步的 token（必须放机密，日志里不会显示）
-3. 打 tag 并推送：
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-去仓库的 Actions 页看构建进度，完成后 Docker Hub 上就有 `latest` 与 `v0.1.0` 两个标签。
-
-以后发新版：改代码 → 提交 → 打新 tag（`v0.1.1`）→ 推 tag。`latest` 会跟着更新，旧 tag 保留。
-
-Docker Hub 免费账号对匿名拉取有频率限制（每 6 小时 100 次），个人自用够。
 
 ## 用起来
 
@@ -161,6 +128,25 @@ Docker Hub 免费账号对匿名拉取有频率限制（每 6 小时 100 次）�
 SMTP、微信推送、Webhook 在页面里填。密码和 Key 用 AES-GCM 加密后写进 `data/settings.json`，密钥在 `data/secret.key`，权限 600。备份 `data/` 就等于备份了全部状态（包括 12306 的登录 Cookie，别随便传）。
 
 微信推送走的是 Server酱 / PushPlus / 企业微信机器人。个人申请不到能发模板消息的公众号，这三条是等价的替代品，一个 Key 就能通。
+
+## 参与测试与反馈
+
+这个仓库现在最缺的不是功能，是**真账号跑一遍**。下面几处只有实盘才能确认，你撞上哪个都欢迎直接开 Issue：
+
+- 自动下单的六步接口，参数是否还和 12306 当前版本对得上
+- 席别列 24/25/26/30 的归属：软座还是无座、高级软卧还是特等座
+- 候补提交（`WAITLIST_ENABLED=true`）
+- 通知渠道：QQ 邮箱 / 163 / Gmail 的 SMTP 参数，Server酱 / PushPlus / 企微机器人的实际到达
+- ARM 机型自建镜像能不能正常跑
+
+提 Issue 时请带上这些，否则很难定位：
+
+- 镜像标签（`v0.1.0` 或 `latest`）和部署方式（Docker Hub 拉取 / 本地构建 / 源码直接跑）
+- `docker compose logs 12306helper --tail 200` 的输出
+- 复现步骤：点了几次、什么车次、什么时间
+- 下单失败的话，把日志里 12306 返回的那段原文贴出来
+
+**贴日志前先脱敏。** 里面可能有 `RAIL_DEVICEID`、`_passport_session` 这类会话 Cookie，等于你的登录态；手机号、身份证号也顺手抹掉。
 
 ## 已知问题
 
