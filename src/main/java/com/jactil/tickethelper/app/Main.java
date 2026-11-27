@@ -36,7 +36,7 @@ public final class Main {
 
         AppContext ctx = AppContext.boot(paths);
         Javalin app = App.create(ctx).start("0.0.0.0", port);
-        log.info("TicketHelper-Linux 已启动，监听 http://0.0.0.0:{}", port);
+        log.info("12306Helper 已启动，监听 http://0.0.0.0:{}", port);
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             log.info("收到停止信号，正在关闭…");

@@ -5,10 +5,10 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.jactil.tickethelper</groupId>
-  <artifactId>tickethelper-linux</artifactId>
+  <artifactId>12306helper</artifactId>
   <version>0.1.0</version>
   <packaging>jar</packaging>
-  <name>TicketHelper-Linux</name>
+  <name>12306Helper</name>
   <description>12306 抢票服务（无界面 / Docker / NAS）</description>
 
   <properties>
@@ -94,7 +94,7 @@
   </dependencies>
 
   <build>
-    <finalName>tickethelper-linux</finalName>
+    <finalName>12306helper</finalName>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

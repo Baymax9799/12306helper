@@ -2,6 +2,15 @@
 FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /src
 
+# 可选：国内网络下 Maven 中央仓库很慢，传 --build-arg MAVEN_MIRROR=<镜像地址> 加速。
+# 例：https://maven.aliyun.com/repository/public
+ARG MAVEN_MIRROR=
+RUN if [ -n "$MAVEN_MIRROR" ]; then \
+      mkdir -p /root/.m2 && \
+      printf '%s' '<settings><mirrors><mirror><id>mirror</id><mirrorOf>central</mirrorOf><url>'"$MAVEN_MIRROR"'</url></mirror></mirrors></settings>' \
+        > /root/.m2/settings.xml; \
+    fi
+
 # 先只拷 pom，让依赖层可缓存
 COPY pom.xml .
 RUN mvn -B -q -DskipTests dependency:go-offline || true
@@ -24,7 +33,7 @@ RUN useradd --uid 1000 --create-home --home-dir /home/app app \
  && chown -R 1000:1000 /data /home/app
 
 WORKDIR /app
-COPY --from=build /src/target/tickethelper-linux.jar /app/app.jar
+COPY --from=build /src/target/12306helper.jar /app/app.jar
 
 # 声明数据卷，图形界面会据此提示挂载；不写任何 ENV，避免创建容器时被预填一堆英文默认值。
 # 端口默认 28080、数据目录默认 /data，都由程序内部兜底。

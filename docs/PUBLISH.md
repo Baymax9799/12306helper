@@ -7,11 +7,11 @@
 ## 方式一：网页建仓库 + 命令行推（最通用，不需要装东西）
 
 1. 打开 <https://github.com/new>
-2. 仓库名填 `tickethelper-linux`，**不要**勾选 "Add a README / .gitignore / license"（会冲突）
+2. 仓库名填 `12306Helper`，**不要**勾选 "Add a README / .gitignore / license"（会冲突）
 3. 建好后，在本目录执行（把 `<你的用户名>` 换掉）：
 
 ```bash
-git remote add origin https://github.com/<你的用户名>/tickethelper-linux.git
+git remote add origin https://github.com/<你的用户名>/12306Helper.git
 git push -u origin main
 ```
 
@@ -25,7 +25,7 @@ git push -u origin main
 ```powershell
 winget install --id GitHub.cli
 gh auth login          # 选 GitHub.com → HTTPS → 浏览器登录
-gh repo create tickethelper-linux --public --source=. --remote=origin --push
+gh repo create 12306Helper --public --source=. --remote=origin --push
 ```
 
 私有仓库就把 `--public` 换成 `--private`。
@@ -37,7 +37,7 @@ gh repo create tickethelper-linux --public --source=. --remote=origin --push
 如果你已经建了仓库但地址不同：
 
 ```bash
-git remote set-url origin https://github.com/<你的用户名>/tickethelper-linux.git
+git remote set-url origin https://github.com/<你的用户名>/12306Helper.git
 git push -u origin main
 ```
 

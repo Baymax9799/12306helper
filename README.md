@@ -1,4 +1,4 @@
-# tickethelper-linux
+# 12306Helper
 
 12306 抢票工具的无界面版本，跑在 Docker 里，用浏览器操作。原项目 [JavaFx-TicketHelper](https://github.com/Jactil777/JavaFx-TicketHelper) 是 JavaFX 桌面程序，这里把界面拆了，换成 Web 服务和一套 HTTP 接口。
 
@@ -26,11 +26,11 @@
 ### 方式一：本地构建（现在就能用）
 
 ```bash
-git clone https://github.com/Baymax9799/tickethelper-linux.git
-cd tickethelper-linux
+git clone https://github.com/Baymax9799/12306Helper.git
+cd 12306Helper
 cp .env.example .env          # 可选。想改端口或指定口令就改这里
 docker compose up -d --build
-docker compose logs tickethelper | grep 口令
+docker compose logs 12306helper | grep 口令
 ```
 
 构建要多等几分钟，Maven 要下依赖。起来后浏览器打开 `http://<NAS地址>:28080`。
@@ -41,21 +41,19 @@ docker compose logs tickethelper | grep 口令
 
 ### 方式二：从 Docker Hub 拉
 
-`docker-compose.hub.yml` 只拉镜像、不编译，适合不想在 NAS 上装源码的场景：
+镜像地址是 `baymax9799/12306helper:latest`。`docker-compose.hub.yml` 只拉镜像、不编译，NAS 上不需要源码、JDK 和 Maven：
 
 ```bash
 docker compose -f docker-compose.hub.yml up -d
 ```
 
-**这个文件目前还用不了**——我手上没有你的 Docker Hub 账号，镜像没推上去过。要启用它，先在你的机器上推一次：
+前提是镜像已经发布过（见下面「发布镜像到 Docker Hub」）。仓库如果是 Public，拉取不需要登录；如果设成了 Private，先 `docker login` 再拉。
+
+Docker Hub 用户名不是 `baymax9799` 的话，在 `.env` 里改一行：
 
 ```bash
-docker login
-docker build -t baymax9799/tickethelper-linux:latest .
-docker push baymax9799/tickethelper-linux:latest
+IMAGE=你的用户名/12306helper:latest
 ```
-
-或者打个 tag 交给 GitHub Actions。仓库里 `.github/workflows/docker-publish.yml` 会在推 `v*` tag 时自动构建并推送，需要在 Settings → Secrets 里加 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN` 两个变量。
 
 ### 在 NAS 的图形界面里创建
 
@@ -64,13 +62,13 @@ docker push baymax9799/tickethelper-linux:latest
 | 项目 | 填什么 |
 |---|---|
 | 端口映射 | 容器 `28080` → 宿主自选，比如 `28080` |
-| 存储 / 挂载 | 容器 `/data` → 宿主绝对路径，比如 `/vol1/1000/docker/tickethelper/data` |
+| 存储 / 挂载 | 容器 `/data` → 宿主绝对路径，比如 `/vol1/1000/docker/12306helper/data` |
 
 不要填 `./data` 这种相对路径，图形界面解析不了，容器会创建失败或起来后立刻退出。目录要先存在并给 uid 1000 写权限：
 
 ```bash
-mkdir -p /vol1/1000/docker/tickethelper/data
-chown -R 1000:1000 /vol1/1000/docker/tickethelper/data
+mkdir -p /vol1/1000/docker/12306helper/data
+chown -R 1000:1000 /vol1/1000/docker/12306helper/data
 ```
 
 口令可以留空（看日志里的随机口令），也可以在环境变量里加一条 `ADMIN_PASSWORD=你的口令`。
@@ -81,8 +79,51 @@ chown -R 1000:1000 /vol1/1000/docker/tickethelper/data
 
 ```bash
 sudo chown -R 1000:1000 data
-docker compose restart tickethelper
+docker compose restart 12306helper
 ```
+
+## 发布镜像到 Docker Hub
+
+两条路，选一条。仓库名固定为 `12306helper`，和 `.env.example` 里的 `IMAGE` 对应。
+
+### 路线一：本机构建后推
+
+```bash
+docker login -u baymax9799
+docker build -t baymax9799/12306helper:latest .
+docker push baymax9799/12306helper:latest
+```
+
+构建阶段要下 Maven 依赖，国内网络会很慢，可以指定镜像源：
+
+```bash
+docker build \
+  --build-arg MAVEN_MIRROR=https://maven.aliyun.com/repository/public \
+  -t baymax9799/12306helper:latest .
+```
+
+第一次 push 会在 Docker Hub 自动创建仓库，**新仓库的默认可见性可能是 Private**。去 <https://hub.docker.com/r/baymax9799/12306helper/settings> 改成 Public，否则 NAS 上不登录就拉不下来。
+
+### 路线二：打 tag 交给 GitHub Actions
+
+仓库里的 `.github/workflows/docker-publish.yml` 会在推送 `v*` tag 时自动构建并推送 `latest` 和该 tag。
+
+1. Docker Hub → Account settings → Security → New Access Token，权限选 Read & Write，复制出来（只显示一次）。
+2. GitHub 仓库 → Settings → Secrets and variables → Actions → New repository secret，加两条：
+   - `DOCKERHUB_USERNAME` = `baymax9799`
+   - `DOCKERHUB_TOKEN` = 上一步的 token
+3. 打 tag 并推送：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+去仓库的 Actions 页看构建进度，完成后 Docker Hub 上就有 `latest` 与 `v0.1.0` 两个标签。
+
+以后发新版：改代码 → 提交 → 打新 tag（`v0.1.1`）→ 推 tag。`latest` 会跟着更新，旧 tag 保留。
+
+Docker Hub 免费账号对匿名拉取有频率限制（每 6 小时 100 次），个人自用够。
 
 ## 用起来
 
@@ -109,6 +150,7 @@ docker compose restart tickethelper
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
+| `IMAGE` | `baymax9799/12306helper:latest` | 镜像地址，用户名不同就改这里 |
 | `HOST_PORT` | `28080` | 宿主机端口，只影响 compose 的端口映射 |
 | `DATA_DIR` | `./data` | 宿主机上的数据目录；NAS 上请写绝对路径 |
 | `ADMIN_PASSWORD` | 空 | 留空则首次启动随机生成并打印；填了就以它为准 |
@@ -136,8 +178,8 @@ SMTP、微信推送、Webhook 在页面里填。密码和 Key 用 AES-GCM 加密
 
 ```bash
 mvn test        # 87 个用例，全用 MockWebServer / GreenMail，不碰真实 12306
-mvn package     # target/tickethelper-linux.jar
-java -jar target/tickethelper-linux.jar
+mvn package     # target/12306helper.jar
+java -jar target/12306helper.jar
 ```
 
 本地跑要三个环境变量：`DATA_DIR`、`PORT`、`ADMIN_PASSWORD`。
@@ -145,7 +187,7 @@ java -jar target/tickethelper-linux.jar
 代码分四层，依赖方向单向：`core`（HTTP、登录、解析）← `engine`（调度、下单、闸门）← `web`（接口和页面）← `app`（装配）。
 
 ```
-src/main/java/com/jactil/tickethelper/
+src/main/java/com/jactil/12306helper/
 ├── app/      入口
 ├── core/     client · auth · query · station · passenger · store · config · security · time
 ├── engine/   调度 · 状态机 · 下单 · 闸门 · 对账 · 候补

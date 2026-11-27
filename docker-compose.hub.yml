@@ -2,8 +2,8 @@
 # 前提：镜像已经推到 Docker Hub（见 README 的「发布镜像」一节）。
 services:
   tickethelper:
-    image: baymax9799/tickethelper-linux:latest
-    container_name: tickethelper
+    image: ${IMAGE:-baymax9799/12306helper:latest}
+    container_name: 12306helper
     restart: unless-stopped
     ports:
       - "${HOST_PORT:-28080}:28080"

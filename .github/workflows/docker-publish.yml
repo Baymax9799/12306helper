@@ -25,5 +25,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/tickethelper-linux:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/tickethelper-linux:${{ github.ref_name }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/12306helper:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/12306helper:${{ github.ref_name }}

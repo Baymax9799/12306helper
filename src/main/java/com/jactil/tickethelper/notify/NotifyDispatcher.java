@@ -88,7 +88,7 @@ public final class NotifyDispatcher {
                 continue;
             }
             try {
-                notifier.send("TicketHelper 测试通知", "如果你收到这条，说明通知配置可用。");
+                notifier.send("12306Helper 测试通知", "如果你收到这条，说明通知配置可用。");
                 results.add(notifier.name() + "：成功");
             } catch (Exception e) {
                 results.add(notifier.name() + "：失败 " + e.getMessage());
