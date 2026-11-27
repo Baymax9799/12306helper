@@ -34,4 +34,33 @@ class AppPathsTest {
         assertEquals(dataDir.toAbsolutePath().resolve("secret.key"), paths.secretKey());
         assertEquals(dataDir.toAbsolutePath().resolve("cookies.json"), paths.cookieStore());
     }
+
+    @Test
+    void fallsBackToContainerDataDirWhenEnvMissing() throws Exception {
+        Path containerData = tmp.resolve("container-data");
+        Files.createDirectories(containerData);
+
+        AppPaths paths = AppPaths.fromEnv(null, tmp.resolve("home").toString(), containerData);
+
+        assertEquals(containerData, paths.dataDir());
+    }
+
+    @Test
+    void explicitEnvWinsOverContainerDataDir() throws Exception {
+        Path containerData = tmp.resolve("container-data");
+        Files.createDirectories(containerData);
+        Path explicit = tmp.resolve("explicit");
+
+        AppPaths paths = AppPaths.fromEnv(explicit.toString(), tmp.resolve("home").toString(), containerData);
+
+        assertEquals(explicit.toAbsolutePath(), paths.dataDir());
+    }
+
+    @Test
+    void missingContainerDirFallsBackToUserHome() {
+        AppPaths paths = AppPaths.fromEnv(null, tmp.resolve("home").toString(),
+                tmp.resolve("no-such-dir"));
+
+        assertEquals(tmp.resolve("home").resolve(".tickethelper"), paths.dataDir());
+    }
 }

@@ -35,7 +35,9 @@ docker compose logs tickethelper | grep 口令
 
 构建要多等几分钟，Maven 要下依赖。起来后浏览器打开 `http://<NAS地址>:28080`。
 
-`.env` 里 `ADMIN_PASSWORD` 留空的话，首次启动会随机生成一个 16 位口令，上面那条 `logs | grep 口令` 就是取它。日志里找不到，说明之前已经初始化过，口令存在 `data/settings.json` 里（bcrypt 哈希，取不出明文）——忘了就删 `data/settings.json` 重来。
+`.env` 里 `ADMIN_PASSWORD` 留空的话，首次启动会随机生成一个 16 位口令，上面那条 `logs | grep 口令` 就是取它。日志里找不到，说明之前已经初始化过，口令存在 `data/settings.json` 里（bcrypt 哈希，取不出明文）。
+
+口令的优先级是：**环境变量 > `data/settings.json` 里的旧哈希 > 随机生成**。所以容器环境变量里改了 `ADMIN_PASSWORD`，重启容器就生效，会覆盖之前的旧口令——不是只有首次启动才算数。忘了口令又不想重建数据，就在环境变量里指定一个新的重启。
 
 ### 方式二：从 Docker Hub 拉
 
@@ -54,6 +56,24 @@ docker push baymax9799/tickethelper-linux:latest
 ```
 
 或者打个 tag 交给 GitHub Actions。仓库里 `.github/workflows/docker-publish.yml` 会在推 `v*` tag 时自动构建并推送，需要在 Settings → Secrets 里加 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN` 两个变量。
+
+### 在 NAS 的图形界面里创建
+
+镜像里没有写任何 `ENV`，所以创建容器时环境变量表是空的，不需要照抄一堆默认值。你只要设两处：
+
+| 项目 | 填什么 |
+|---|---|
+| 端口映射 | 容器 `28080` → 宿主自选，比如 `28080` |
+| 存储 / 挂载 | 容器 `/data` → 宿主绝对路径，比如 `/vol1/1000/docker/tickethelper/data` |
+
+不要填 `./data` 这种相对路径，图形界面解析不了，容器会创建失败或起来后立刻退出。目录要先存在并给 uid 1000 写权限：
+
+```bash
+mkdir -p /vol1/1000/docker/tickethelper/data
+chown -R 1000:1000 /vol1/1000/docker/tickethelper/data
+```
+
+口令可以留空（看日志里的随机口令），也可以在环境变量里加一条 `ADMIN_PASSWORD=你的口令`。
 
 ### 目录权限
 
@@ -89,11 +109,12 @@ docker compose restart tickethelper
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `HOST_PORT` | `28080` | 宿主机端口 |
-| `ADMIN_PASSWORD` | 空 | 留空则首次启动随机生成并打印 |
-| `JAVA_OPTS` | `-Xms128m -Xmx384m` | 单账号多任务够用 |
-| `TZ` | `Asia/Shanghai` | 影响每日额度的结算日 |
+| `HOST_PORT` | `28080` | 宿主机端口，只影响 compose 的端口映射 |
+| `DATA_DIR` | `./data` | 宿主机上的数据目录；NAS 上请写绝对路径 |
+| `ADMIN_PASSWORD` | 空 | 留空则首次启动随机生成并打印；填了就以它为准 |
 | `WAITLIST_ENABLED` | `false` | 候补下单开关 |
+
+镜像内部还有两个默认值，需要时才用 `-e` 覆盖：端口 `PORT=28080`、数据目录容器内为 `/data`。JVM 参数默认 `-Xms128m -Xmx384m`，要调就设 `JAVA_OPTS`；时区已经写进镜像的 `/etc/localtime`，不依赖 `TZ` 变量。
 
 SMTP、微信推送、Webhook 在页面里填。密码和 Key 用 AES-GCM 加密后写进 `data/settings.json`，密钥在 `data/secret.key`，权限 600。备份 `data/` 就等于备份了全部状态（包括 12306 的登录 Cookie，别随便传）。
 

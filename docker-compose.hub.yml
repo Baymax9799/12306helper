@@ -8,11 +8,9 @@ services:
     ports:
       - "${HOST_PORT:-28080}:28080"
     environment:
-      TZ: Asia/Shanghai
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
-      JAVA_OPTS: "-Xms128m -Xmx384m"
     volumes:
-      - ./data:/data
+      - "${DATA_DIR:-./data}:/data"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:28080/healthz"]
       interval: 30s

@@ -1,23 +1,22 @@
 services:
   tickethelper:
-    # 有远端镜像就用远端，没有就本地构建；两条命令都能跑：
-    #   docker compose up -d            （本地构建并启动）
-    #   docker compose pull && up -d    （用 Docker Hub 上的镜像）
+    # 有远端镜像就用远端，没有就本地构建：
+    #   docker compose up -d              （本地构建并启动）
+    #   docker compose pull && up -d      （用 Docker Hub 上的镜像）
     image: baymax9799/tickethelper-linux:latest
     build: .
     container_name: tickethelper
     restart: unless-stopped
     ports:
-      # 左边是宿主端口，冲突就改 HOST_PORT（或直接改这里）
+      # 左边是宿主端口，冲突就改 .env 里的 HOST_PORT
       - "${HOST_PORT:-28080}:28080"
     environment:
-      TZ: Asia/Shanghai
-      # 留空 = 首次启动随机生成口令并打印到日志
-      # 查看：docker compose logs tickethelper | grep 口令
+      # 只留这一项。留空 = 首次启动随机生成并打印到日志。
+      # 其余（端口、数据目录、JVM 参数、时区）都有默认值，不需要在这里重复一遍。
       ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
-      JAVA_OPTS: "-Xms128m -Xmx384m"
     volumes:
-      - ./data:/data
+      # NAS 上请把 DATA_DIR 设成绝对路径，例如 /vol1/1000/docker/tickethelper/data
+      - "${DATA_DIR:-./data}:/data"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:28080/healthz"]
       interval: 30s

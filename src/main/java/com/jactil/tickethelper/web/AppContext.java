@@ -92,26 +92,16 @@ public final class AppContext implements AutoCloseable {
     }
 
     public static AppContext boot(AppPaths paths) {
+        return boot(paths, System.getenv());
+    }
+
+    /** 允许测试注入环境变量，避免读进程级 env。 */
+    public static AppContext boot(AppPaths paths, java.util.Map<String, String> env) {
         AesGcm cipher = AesGcm.load(paths.secretKey());
         SettingsStore store = new SettingsStore(paths.settings(), cipher);
         Settings settings = store.load();
 
-        if (settings.adminPasswordHash == null || settings.adminPasswordHash.isBlank()) {
-            String fromEnv = System.getenv("ADMIN_PASSWORD");
-            if (fromEnv != null && !fromEnv.isBlank()) {
-                settings.adminPasswordHash = Passwords.hash(fromEnv);
-                store.save(settings);
-                log.info("已使用环境变量 ADMIN_PASSWORD 初始化管理员口令");
-            } else {
-                String generated = Passwords.random(16);
-                settings.adminPasswordHash = Passwords.hash(generated);
-                store.save(settings);
-                log.warn("=====================================================");
-                log.warn("首次启动，已生成管理员口令：{}", generated);
-                log.warn("请立即登录 http://<NAS_IP>:8080 并在设置里改掉它");
-                log.warn("=====================================================");
-            }
-        }
+        applyAdminPassword(settings, store, env);
 
         Db db = Db.open(paths.db());
         PersistentCookieStore cookieStore = PersistentCookieStore.open(paths.cookieStore());
@@ -141,6 +131,58 @@ public final class AppContext implements AutoCloseable {
         } catch (RuntimeException e) {
             log.warn("站点库初始化失败：{}", e.getMessage());
         }
+    }
+
+    /**
+     * 管理员口令来源，优先级：环境变量 ADMIN_PASSWORD &gt; settings.json 里的旧哈希 &gt; 随机生成。
+     *
+     * <p>只要容器里给了 ADMIN_PASSWORD 就以它为准。早先的实现只在首次启动读环境变量，
+     * 于是「重建容器、改了环境变量，却始终登录不上」——旧哈希还在，新口令被忽略。
+     * 现在每次启动都会比对，不一致就覆盖。
+     */
+    static void applyAdminPassword(Settings settings, SettingsStore store,
+                                   java.util.Map<String, String> env) {
+        String fromEnv = normalizePassword(env == null ? null : env.get("ADMIN_PASSWORD"));
+        boolean hasHash = settings.adminPasswordHash != null && !settings.adminPasswordHash.isBlank();
+
+        if (fromEnv != null) {
+            if (!hasHash || !Passwords.verify(fromEnv, settings.adminPasswordHash)) {
+                settings.adminPasswordHash = Passwords.hash(fromEnv);
+                store.save(settings);
+                log.info("已按环境变量 ADMIN_PASSWORD 设置管理员口令");
+            } else {
+                log.info("管理员口令与环境变量一致，无需改动");
+            }
+            return;
+        }
+
+        if (hasHash) {
+            return;
+        }
+
+        String generated = Passwords.random(16);
+        settings.adminPasswordHash = Passwords.hash(generated);
+        store.save(settings);
+        log.warn("=====================================================");
+        log.warn("首次启动，已生成管理员口令：{}", generated);
+        log.warn("请登录后到设置里改掉，或用 ADMIN_PASSWORD 环境变量指定");
+        log.warn("=====================================================");
+    }
+
+    /** 去掉首尾空格与成对引号；空值视作未设置。 */
+    static String normalizePassword(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String value = raw.trim();
+        if (value.length() >= 2) {
+            boolean doubleQuoted = value.startsWith("\"") && value.endsWith("\"");
+            boolean singleQuoted = value.startsWith("'") && value.endsWith("'");
+            if (doubleQuoted || singleQuoted) {
+                value = value.substring(1, value.length() - 1).trim();
+            }
+        }
+        return value.isEmpty() ? null : value;
     }
 
     public Settings settings() {

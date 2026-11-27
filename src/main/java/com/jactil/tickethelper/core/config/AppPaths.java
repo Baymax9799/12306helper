@@ -5,7 +5,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * 数据目录约定。容器内是 /data，开发环境回退到 ~/.tickethelper。
+ * 数据目录约定。
+ *
+ * <p>优先级：{@code DATA_DIR} 环境变量 &gt; 容器里的 {@code /data}（存在且可写时）&gt;
+ * {@code ~/.tickethelper}。
+ *
+ * <p>之所以有第二档：镜像里刻意不写 ENV，NAS 图形界面创建容器时环境变量表就是空的。
+ * 容器本身有 /data 这个挂载点，自动认它即可，不必让用户在环境变量里再填一遍。
  */
 public final class AppPaths {
 
@@ -16,7 +22,22 @@ public final class AppPaths {
     }
 
     public static AppPaths fromEnv() {
-        return resolve(System.getenv("DATA_DIR"), System.getProperty("user.home"));
+        String envDataDir = System.getenv("DATA_DIR");
+        String userHome = System.getProperty("user.home");
+        boolean windows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        // 只在类 Unix 环境认 /data；Windows 上 "/data" 会变成当前盘符下的 \data，容易误伤
+        Path containerData = windows ? null : Path.of("/data");
+        return fromEnv(envDataDir, userHome, containerData);
+    }
+
+    public static AppPaths fromEnv(String envDataDir, String userHome, Path containerDataDir) {
+        if (envDataDir != null && !envDataDir.isBlank()) {
+            return resolve(envDataDir, userHome);
+        }
+        if (containerDataDir != null && Files.isDirectory(containerDataDir)) {
+            return new AppPaths(containerDataDir).ensure();
+        }
+        return resolve(null, userHome);
     }
 
     public static AppPaths resolve(String envDataDir, String userHome) {
