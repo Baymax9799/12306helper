@@ -61,6 +61,16 @@ docker logs 12306helper | grep 口令
 
 **镜像只提供 `linux/amd64`**（Intel / AMD 的 x86_64）。ARM 机型（树莓派、DS220j 之类）会报 `exec format error`，需要用下面的方式自己构建。
 
+镜像跟着 `main` 分支自动构建：代码推送后大约五分钟，GitHub Actions 会把新的 `latest` 推到 Docker Hub；发版时打个 `v*` tag，会额外产出同名版本标签（目前有 `v0.1.0`、`v0.2.0`）。纯文档改动不触发构建。
+
+更新到最新版（数据在挂载目录里，删容器不影响）：
+
+```bash
+docker pull baymax9799/12306helper:latest
+docker rm -f 12306helper
+# 再执行上面那条 docker run
+```
+
 ---
 
 ## Docker Compose 部署
