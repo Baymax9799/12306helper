@@ -21,12 +21,22 @@ RUN mvn -B -q -DskipTests package
 # 运行层：只要 JRE
 FROM eclipse-temurin:17-jre-jammy
 
-# 时区直接写进文件系统，不依赖运行时的 TZ 环境变量
+# 时区与中文 locale 都写进文件系统，不依赖运行时再配。
+# 注意：zh_CN.UTF-8 必须先 locale-gen 出来，否则 glibc 会退回 C/POSIX 并打 setlocale 警告。
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl tzdata \
+ && apt-get install -y --no-install-recommends curl tzdata locales \
+ && sed -i 's/^# *\(zh_CN.UTF-8\)/\1/' /etc/locale.gen \
+ && sed -i 's/^# *\(en_US.UTF-8\)/\1/' /etc/locale.gen \
+ && locale-gen \
+ && update-locale LANG=zh_CN.UTF-8 \
  && ln -snf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
  && echo "Asia/Shanghai" > /etc/timezone \
  && rm -rf /var/lib/apt/lists/*
+
+# 覆盖基础镜像自带的 en_US 默认值（基镜像本就有这三个变量，不算新增配置项）
+ENV LANG=zh_CN.UTF-8 \
+    LANGUAGE=zh_CN:zh \
+    LC_ALL=zh_CN.UTF-8
 
 RUN useradd --uid 1000 --create-home --home-dir /home/app app \
  && mkdir -p /data \
