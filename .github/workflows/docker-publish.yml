@@ -1,7 +1,12 @@
 name: Docker
 
-# 打 tag（如 v0.1.0）时构建并推送到 Docker Hub。
-# 需要先在仓库 Settings → Secrets 里配 DOCKERHUB_USERNAME 与 DOCKERHUB_TOKEN。
+# 打 tag（比如 v0.1.0）时，GitHub 的机器会自动构建镜像并推到 Docker Hub。
+# 不需要你本地装 Docker。
+#
+# 需要先配两样东西（仓库 Settings → Secrets and variables → Actions）：
+#   1) Docker Hub 用户名：放 Variables 里的 DOCKERHUB_USERNAME 就行（不算机密）；
+#      放 Secrets 里同名也能用，本文件两种都认。
+#   2) Docker Hub Access Token：必须放 Secrets 里的 DOCKERHUB_TOKEN。
 on:
   push:
     tags: ['v*']
@@ -15,15 +20,18 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      - uses: docker/login-action@v3
+      - name: 登录 Docker Hub
+        uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v6
+      - name: 构建并推送
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
+          # 一次推两个标签：latest 和本次的版本号
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/12306helper:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/12306helper:${{ github.ref_name }}
+            ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}/12306helper:latest
+            ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}/12306helper:${{ github.ref_name }}

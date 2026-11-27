@@ -109,9 +109,9 @@ docker build \
 仓库里的 `.github/workflows/docker-publish.yml` 会在推送 `v*` tag 时自动构建并推送 `latest` 和该 tag。
 
 1. Docker Hub → Account settings → Security → New Access Token，权限选 Read & Write，复制出来（只显示一次）。
-2. GitHub 仓库 → Settings → Secrets and variables → Actions → New repository secret，加两条：
-   - `DOCKERHUB_USERNAME` = `baymax9799`
-   - `DOCKERHUB_TOKEN` = 上一步的 token
+2. GitHub 仓库 → Settings → Secrets and variables → Actions：
+   - **Variables** 页签 → New repository variable：`DOCKERHUB_USERNAME` = `baymax9799`（用户名不算机密，放变量里方便查看）
+   - **Secrets** 页签 → New repository secret：`DOCKERHUB_TOKEN` = 上一步的 token（必须放机密，日志里不会显示）
 3. 打 tag 并推送：
 
 ```bash
