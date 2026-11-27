@@ -8,13 +8,20 @@
 
 ## 能用的和还没验证的
 
-登录有三种：扫码、短信验证码、粘贴 Cookie，都是能用的。短信那条是为了人在外面、手边只有手机的情况——密码只在当次请求里用一下，不落盘。
+| 功能 | 状态 |
+|---|---|
+| 扫码 / 短信验证码 / 粘贴 Cookie 登录 | 可用 |
+| 余票查询，带各席别票价 | 可用 |
+| 乘车人同步（本地只存掩码） | 可用 |
+| 多车次 / 多日期 / 多席别 / 多乘客任务 | 可用 |
+| 定时开抢：提前 30 秒预热，开抢后 60 秒内 300ms 一轮 | 可用 |
+| 自动提交订单，停在「待支付」 | 已实现，参数需实盘对一次 |
+| 邮件 / 微信 / Webhook 通知 | 可用 |
+| 候补下单 | 默认关闭，见文末 |
 
-余票查询带各席别票价。乘车人从 12306 同步，本地只存 `张*`、`****1234` 这种掩码。任务可以同时盯多车次、多日期、多席别、多名乘客；设了开抢时刻的话，放票前 30 秒开始预热，放票后 60 秒内按 300ms 一轮查。
+短信登录是为了人在外面、手边只有手机的情况，密码只在当次请求里用一下，不落盘。乘车人从 12306 同步，本地只存 `张*`、`****1234` 这种掩码。
 
-通知支持邮件、Server酱 / PushPlus / 企业微信机器人、通用 Webhook。
-
-自动下单的代码写完了，参数照着公开实现来的，还没用真账号验过。候补接口也有，默认关着。
+通知那行走的是 Server酱 / PushPlus / 企业微信机器人，加一个通用 Webhook 兜底。
 
 ## 部署
 
@@ -31,6 +38,25 @@ docker compose -f docker-compose.hub.yml up -d
 镜像只出了 amd64。x86_64 的机器直接用——群晖 DS918+、威联通 TS-x51、自建 E3 这些都行；ARM 机型（DS220j、树莓派之类）拉下来会报 `exec format error`，得自己 build，见下。
 
 Docker Hub 用户名不是 `baymax9799` 的话，`.env` 里改一行 `IMAGE`。
+
+`docker compose -f` 只找当前目录下的文件，人在 `/root` 这类目录时当然找不到。没 clone 仓库的话，要么先把文件拉下来，要么直接用 `docker run`：
+
+```bash
+mkdir -p /vol1/1000/docker/12306helper/data
+chown -R 1000:1000 /vol1/1000/docker/12306helper/data
+
+docker run -d --name 12306helper --restart unless-stopped \
+  -p 28080:28080 \
+  -v /vol1/1000/docker/12306helper/data:/data \
+  -e ADMIN_PASSWORD=你的口令 \
+  baymax9799/12306helper:latest
+```
+
+用 compose 的话先把文件下载到当前目录再执行：
+
+```bash
+curl -O https://raw.githubusercontent.com/Baymax9799/12306Helper/main/docker-compose.hub.yml
+```
 
 ### 本地构建
 
